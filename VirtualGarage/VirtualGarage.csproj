@@ -36,17 +36,20 @@
     <LangVersion>Default</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="HavokWrapper, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\torch-server\DedicatedServer64\HavokWrapper.dll</HintPath>
+    <Reference Include="HavokWrapper">
+      <HintPath>..\..\..\..\..\Arrakis\torch-server2\DedicatedServer64\HavokWrapper.dll</HintPath>
     </Reference>
     <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c">
       <HintPath>C:\torch-server\NLog.dll</HintPath>
     </Reference>
+    <Reference Include="ProtoBuf.Net">
+      <HintPath>..\..\..\..\..\Arrakis\torch-server2\DedicatedServer64\ProtoBuf.Net.dll</HintPath>
+    </Reference>
     <Reference Include="ProtoBuf.Net, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
       <HintPath>C:\torch-server\DedicatedServer64\ProtoBuf.Net.dll</HintPath>
     </Reference>
-    <Reference Include="ProtoBuf.Net.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\torch-server\DedicatedServer64\ProtoBuf.Net.Core.dll</HintPath>
+    <Reference Include="ProtoBuf.Net.Core">
+      <HintPath>..\..\..\..\..\Arrakis\torch-server2\DedicatedServer64\ProtoBuf.Net.Core.dll</HintPath>
     </Reference>
     <Reference Include="Sandbox.Common">
       <HintPath>$(SolutionDir)\GameBinaries\Sandbox.Common.dll</HintPath>
@@ -91,32 +94,13 @@
       <HintPath>C:\torch-server\DedicatedServer64\SpaceEngineers.ObjectBuilders.XmlSerializers.dll</HintPath>
     </Reference>
     <Reference Include="Torch">
-      <HintPath>$(SolutionDir)\TorchBinaries\Torch.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Torch, Version=1.3.1.153, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\torch-server\Torch.dll</HintPath>
+      <HintPath>..\..\..\..\..\Arrakis\torch-server2\Torch.dll</HintPath>
     </Reference>
     <Reference Include="Torch.API">
-      <HintPath>$(SolutionDir)\TorchBinaries\Torch.API.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Torch.API, Version=1.3.1.153, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\torch-server\Torch.API.dll</HintPath>
-    </Reference>
-    <Reference Include="Torch.Server">
-      <HintPath>$(SolutionDir)\TorchBinaries\Torch.Server.exe</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Torch.Server, Version=1.3.1.153, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\torch-server\Torch.Server.exe</HintPath>
+      <HintPath>..\..\..\..\..\Arrakis\torch-server2\Torch.API.dll</HintPath>
     </Reference>
     <Reference Include="VRage">
       <HintPath>$(SolutionDir)\GameBinaries\VRage.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="HavokWrapper">
-      <HintPath>$(SolutionDir)\GameBinaries\HavokWrapper.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="VRage, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
@@ -190,10 +174,6 @@
     </Reference>
     <Reference Include="VRage.Scripting">
       <HintPath>$(SolutionDir)\GameBinaries\VRage.Scripting.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="ProtoBuf.Net.Core">
-      <HintPath>$(SolutionDir)\GameBinaries\ProtoBuf.Net.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="NLog">

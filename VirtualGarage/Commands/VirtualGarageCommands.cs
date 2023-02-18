@@ -42,8 +42,8 @@ namespace VirtualGarage
                         Directory.GetFiles(
                             Path.Combine(Plugin.Instance.Config.PathToVirtualGarage,
                                 Context.Player.SteamUserId.ToString()), "*.sbc");
-                    System.Collections.Generic.List<string> all =
-                        new System.Collections.Generic.List<string>((IEnumerable<string>) files).FindAll(
+                    List<string> all =
+                        new List<string>((IEnumerable<string>) files).FindAll(
                             (Predicate<string>) (s => s.EndsWith(".sbc")));
                     if (files.Length == 0 || all.Count<string>() == 0)
                     {
@@ -52,8 +52,8 @@ namespace VirtualGarage
                     }
                     else
                     {
-                        System.Collections.Generic.List<string> resultListFiles =
-                            new System.Collections.Generic.List<string>();
+                        List<string> resultListFiles =
+                            new List<string>();
                         all.SortNoAlloc<string>((Comparison<string>) ((s, s1) =>
                             string.Compare(s, s1, StringComparison.Ordinal)));
                         all.ForEach((Action<string>) (s => resultListFiles.Add(s.Replace(".sbc", ""))));
@@ -138,6 +138,10 @@ namespace VirtualGarage
         [Permission(MyPromoteLevel.None)]
         public void Load(int index, bool spawnDynamic = false, bool loadbase = false)
         {
+            if (Plugin.Instance.Config.OnlyLoadBase)
+            {
+                loadbase = true;
+            }
             if (!Directory.Exists(Path.Combine(Plugin.Instance.Config.PathToVirtualGarage,
                     Context.Player.SteamUserId.ToString())))
             {

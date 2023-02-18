@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Sandbox.Common.ObjectBuilders;
 using Sandbox.Game.Entities;
 using Sandbox.Game.GUI;
@@ -31,7 +32,7 @@ namespace VirtualGarage
       Delegate.AddListenerDelegate addListenerDelegate = null,
       bool convertToDynamic = false)
     {
-      VirtualGarageLoad.SpawnSomeGrids(MyBlueprintUtils.LoadPrefab(str).ShipBlueprints[0].CubeGrids, spawnPosition, masterIdentityId, addListenerDelegate, convertToDynamic);
+      Task.Run(() => SpawnSomeGrids(MyBlueprintUtils.LoadPrefab(str).ShipBlueprints[0].CubeGrids, spawnPosition, masterIdentityId, addListenerDelegate, convertToDynamic));
     }
 
     public static void RemapOwnership(MyObjectBuilder_CubeGrid[] cubeGrids, long new_owner)
@@ -76,7 +77,7 @@ namespace VirtualGarage
       Delegate.AddListenerDelegate addListenerDelegate = null,
       bool convertToDynamic = false)
     {
-      MyAPIGateway.Entities.RemapObjectBuilderCollection(cubeGrids);
+      
       VirtualGarageLoad.RemapOwnership(cubeGrids, masterIdentityId);
       Vector3D vector3D1 = (Vector3D) cubeGrids[0].PositionAndOrientation.GetValueOrDefault().Position + Vector3D.Zero;
       Vector3D vector3D2 = (Vector3D) cubeGrids[0].PositionAndOrientation.Value.Position + Vector3D.Zero;
@@ -121,6 +122,7 @@ namespace VirtualGarage
 
       foreach (var cubeGrid in cubeGrids)
       {
+        cubeGrid.CreatePhysics = true;
         foreach (var myObjectBuilderCubeBlock in cubeGrid.CubeBlocks)
         {
           if (myObjectBuilderCubeBlock is MyObjectBuilder_Drill)
@@ -131,8 +133,7 @@ namespace VirtualGarage
 
         MyAPIGateway.Entities.CreateFromObjectBuilderParallel(cubeGrid, completionCallback: ((Action<IMyEntity>) (entity =>
         {
-          ((MyCubeGrid) entity).DetectDisconnectsAfterFrame();
-          MyAPIGateway.Entities.AddEntity(entity);
+          MyAPIGateway.Entities.AddEntity(entity, true);
           List<MyObjectBuilder_EntityBase> list = new List<MyObjectBuilder_EntityBase>();
           foreach (var g in cubeGrids)
           {

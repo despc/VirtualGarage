@@ -67,6 +67,7 @@ namespace VirtualGarage
                         IsItSaved = true;
                         LastGrid = (MyCubeGrid)IEntity;
                     }
+                    break;
                 }
             }
             else
@@ -231,7 +232,7 @@ namespace VirtualGarage
                 filenameexported = filenameexported.Replace(ch.ToString(), ".");
             }
 
-            string path = Path.Combine(str, filenameexported + ".sbc");
+            string path = Path.Combine(str, filenameexported + new Random().Next(1000, 9999) + ".sbc");
             Task.Run(() =>
             {
                 if (MyObjectBuilderSerializer.SerializeXML(path, false, newObject2))

@@ -12,6 +12,7 @@ namespace VirtualGarage
         private bool _ChangeOwner;
         private bool _ConvertToStatic;
         private bool _ConvertToDynamic;
+        private bool _OnlyLoadBase;
 
         private float _MaxSpawnRadius = 500;
         private float _MaxRangeToGrid = 1000;
@@ -79,6 +80,13 @@ namespace VirtualGarage
         {
             get => _ConvertToDynamic;
             set => SetValue(ref _ConvertToDynamic, value);
+        }
+        
+        [DisplayTab(Name = "Only LoadBase", GroupName = "Load settings", Tab = "Load settings", Order = 0, Description = "Load grid only on old cords")]
+        public bool OnlyLoadBase
+        {
+            get => _OnlyLoadBase;
+            set => SetValue(ref _OnlyLoadBase, value);
         }
 
         [DisplayTab(Name = "Max spawn radius", GroupName = "Load settings", Tab = "Load settings", Order = 0, Description = "Max spawn radius")]
