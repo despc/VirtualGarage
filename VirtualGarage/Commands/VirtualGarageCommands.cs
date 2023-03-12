@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using NLog;
+using Sandbox.Game.Entities;
 using Sandbox.Game.GameSystems;
 using Sandbox.Game.GUI;
 using Sandbox.ModAPI;
@@ -226,18 +227,32 @@ namespace VirtualGarage
                         {
                             Context.Player.RequestChangeBalance(-cost);
                             VirtualGarageLoad.DoSpawnGrids(identityId, str, spawnPosition,
-                                (Delegate.AddListenerDelegate) ((grid, identity) =>
+                                (Delegate.AddListenerDelegate)((grid, identity, spawned, totalGrids) =>
                                 {
-                                    VirtualGarageLoad.AddGps(grid, identity);
-                                    foreach (var myCubeBlock in grid.GetFatBlocks())
+                                    spawned.Add(grid);
+                                    if (totalGrids == spawned.Count)
                                     {
-                                        if (myCubeBlock is IMyMotorStator)
+                                        MyCubeGrid maingrid = null;
+                                        foreach (var g in spawned)
                                         {
-                                            ((IMyMotorStator)myCubeBlock).Attach();
+                                            if (maingrid == null)
+                                            {
+                                                maingrid = g;
+                                            }
+                                            else
+                                            {
+                                                if (g.BlocksCount > maingrid.BlocksCount)
+                                                {
+                                                    maingrid = g;
+                                                }
+                                            }
+
+                                            MyAPIGateway.Entities.AddEntity(g, true);
                                         }
-                                        if (myCubeBlock is IMyShipDrill)
+
+                                        if (grid.BigOwners.Count > 0)
                                         {
-                                            ((IMyShipDrill)myCubeBlock).Enabled = false;
+                                            VirtualGarageLoad.AddGps(maingrid, identity);
                                         }
                                     }
                                 }), spawnDynamic);

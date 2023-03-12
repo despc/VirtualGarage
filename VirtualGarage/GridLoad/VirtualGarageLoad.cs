@@ -10,7 +10,6 @@ using VRage.Game;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
-using VRage.ObjectBuilders;
 using VRageMath;
 
 namespace VirtualGarage
@@ -18,7 +17,7 @@ namespace VirtualGarage
   
   public class Delegate
   {
-    public delegate void AddListenerDelegate(MyCubeGrid grid, long myPlayerIdentity);
+    public delegate void AddListenerDelegate(MyCubeGrid grid, long myPlayerIdentity, HashSet<MyCubeGrid> spawned, int totalGrids);
   }
   
   public class VirtualGarageLoad
@@ -78,9 +77,10 @@ namespace VirtualGarage
       bool convertToDynamic = false)
     {
       
-      VirtualGarageLoad.RemapOwnership(cubeGrids, masterIdentityId);
-      Vector3D vector3D1 = (Vector3D) cubeGrids[0].PositionAndOrientation.GetValueOrDefault().Position + Vector3D.Zero;
-      Vector3D vector3D2 = (Vector3D) cubeGrids[0].PositionAndOrientation.Value.Position + Vector3D.Zero;
+      RemapOwnership(cubeGrids, masterIdentityId);
+      var mainGrid = cubeGrids[0];
+      Vector3D vector3D1 = (Vector3D) mainGrid.PositionAndOrientation.GetValueOrDefault().Position + Vector3D.Zero;
+      Vector3D vector3D2 = (Vector3D) mainGrid.PositionAndOrientation.Value.Position + Vector3D.Zero;
       if (Plugin.Instance.Config.ConvertToStatic && Plugin.Instance.Config.ConvertToDynamic)
         Plugin.Instance.Config.ConvertToDynamic = false;
       for (int index = 0; index < cubeGrids.Length; ++index)
@@ -130,18 +130,16 @@ namespace VirtualGarage
             ((MyObjectBuilder_Drill) myObjectBuilderCubeBlock).Enabled = false;
           }
         }
-
-        MyAPIGateway.Entities.CreateFromObjectBuilderParallel(cubeGrid, completionCallback: ((Action<IMyEntity>) (entity =>
-        {
-          MyAPIGateway.Entities.AddEntity(entity, true);
-          List<MyObjectBuilder_EntityBase> list = new List<MyObjectBuilder_EntityBase>();
-          foreach (var g in cubeGrids)
+      }
+      MyEntities.RemapObjectBuilderCollection(cubeGrids);
+      HashSet<MyCubeGrid> _spawned = new HashSet<MyCubeGrid>();
+      foreach (var cubeGrid in cubeGrids)
+      {
+        MyAPIGateway.Entities.CreateFromObjectBuilderParallel(cubeGrid, false,
+          completionCallback: (Action<IMyEntity>)(entity =>
           {
-            list.Add(g);
-          }
-          MyAPIGateway.Multiplayer.SendEntitiesCreated(list);
-          addListenerDelegate((MyCubeGrid) entity, masterIdentityId);
-        })));
+            addListenerDelegate((MyCubeGrid)entity, masterIdentityId, _spawned, cubeGrids.Length);
+          }));
       }
     }
   }
