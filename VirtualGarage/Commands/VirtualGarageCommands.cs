@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using Sandbox.Game.Entities;
@@ -263,16 +264,28 @@ namespace VirtualGarage
                                     Plugin.Instance.Config.GridSpawnedToWorldRespond + " :" + cubeGrid?.DisplayName,
                                     (string) null, (string) null);
                                 Log.Info("Структура: " + cubeGrid?.DisplayName +
-                                                               " перенесена в мир");
+                                         " перенесена в мир");
                             }
 
                             Task.Run(() =>
                             {
-                                if (File.Exists(str + "_spawned"))
-                                    File.Delete(str + "_spawned");
-                                File.Move(str, str + "_spawned");
-                            });
+                                while (true)
+                                {
+                                    try
+                                    {
+                                        if (File.Exists(str + "_spawned"))
+                                            File.Delete(str + "_spawned");
+                                        File.Move(str, str + "_spawned");
+                                        break;
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        Log.Error("Rename exception, retry", e);
+                                    }
 
+                                    Thread.Sleep(50);
+                                }
+                            });
                         }
                         else
                         {
