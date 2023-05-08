@@ -206,6 +206,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Commands\VirtualGarageHelpCommand.cs" />
+    <Compile Include="GridLoad\FixShipLogic.cs" />
+    <Compile Include="GridLoad\Voxels.cs" />
     <Compile Include="Views\DisplayTab.cs" />
     <Compile Include="Views\FilteredGrid.cs" />
     <Compile Include="Views\UserControl1.xaml.cs">

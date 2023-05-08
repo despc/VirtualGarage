@@ -5,14 +5,18 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
+using Sandbox.Engine.Multiplayer;
 using Sandbox.Game.Entities;
 using Sandbox.Game.GameSystems;
 using Sandbox.Game.GUI;
+using Sandbox.Game.World;
 using Sandbox.ModAPI;
+using Scripts.Shared;
 using Torch.Commands;
 using Torch.Commands.Permissions;
 using VRage.Game;
 using VRage.Game.ModAPI;
+using VRage.Network;
 using VRageMath;
 
 namespace VirtualGarage
@@ -249,12 +253,34 @@ namespace VirtualGarage
                                             }
 
                                             MyAPIGateway.Entities.AddEntity(g, true);
+                                            if (!g.IsStatic)
+                                            {
+                                                if (Voxels.IsGridInsideVoxel(g))
+                                                {
+                                                    g.Physics?.SetSpeeds(Vector3.Zero, Vector3.Zero);
+                                                    g.ConvertToStatic();
+                                                    MyMultiplayer.RaiseEvent(grid, x => x.ConvertToStatic);
+                                                    foreach (var player in MySession.Static.Players.GetOnlinePlayers())
+                                                    {
+                                                        MyMultiplayer.RaiseEvent(grid, x => x.ConvertToStatic, new EndpointId(player.Id.SteamId));
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         if (grid.BigOwners.Count > 0)
                                         {
                                             VirtualGarageLoad.AddGps(maingrid, identity);
                                         }
+                                        MyAPIGateway.Parallel.StartBackground(() =>
+                                        {
+                                            MyAPIGateway.Parallel.Sleep(5000); 
+                                            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                                            {
+                                                FixShipLogic.DoFixShip(maingrid);
+                                            });
+                                        });
+                                        
                                     }
                                 }), spawnDynamic);
                             foreach (MyObjectBuilder_CubeGrid cubeGrid in MyBlueprintUtils.LoadPrefab(str)
