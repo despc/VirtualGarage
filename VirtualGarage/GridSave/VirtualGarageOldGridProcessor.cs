@@ -29,11 +29,12 @@ namespace VirtualGarage
                 Log.Info("Check old grids started");
                 try
                 {
-                    await Task.Delay(30000);
+                    await Task.Delay(10000);
                     var myCubeGrids = MyEntities.GetEntities().OfType<MyCubeGrid>();
                     var PlayersList = MySession.Static.Players.GetAllIdentities().ToList();
                     await Task.Run(() =>
                     {
+                        CheckCrashDupeAndAntidupe();
                         CheckAllGrids(myCubeGrids, PlayersList);
                     });
                     await Task.Delay(new Random().Next(60000, 180000));
@@ -73,6 +74,67 @@ namespace VirtualGarage
                     }
                 }
             }
+        }
+
+        private void CheckCrashDupeAndAntidupe()
+        {
+            string[] dirs =
+                Directory.GetDirectories(Plugin.Instance.Config.PathToVirtualGarage);
+
+            foreach (var dir in dirs)
+            {
+                string[] files =
+                    Directory.GetFiles(dir, "*.sbc");
+                foreach (var file in files)
+                {
+                    if (file.EndsWith("unsaved.sbc"))
+                    {
+                        Log.Warn("Delete dupped grid " + file);
+                        File.Delete(file);
+                    }
+                    
+                    if (file.EndsWith("_spawned_unsaved"))
+                    {
+                        Log.Warn("Restore antiduped grid " + file);
+                        var newFile = file.Replace("_spawned_unsaved", "");
+                        if (File.Exists(newFile))
+                            File.Delete(newFile);
+                        File.Move(file, newFile);
+                    }
+                    
+                }
+            }
+            
+        }
+        
+        public void OnSaved()
+        {
+            Task.Run(() =>
+            {
+                string[] dirs =
+                    Directory.GetDirectories(Plugin.Instance.Config.PathToVirtualGarage);
+
+                foreach (var dir in dirs)
+                {
+                    string[] files =
+                        Directory.GetFiles(dir, "*.sbc");
+                    foreach (var file in files)
+                    {
+                        if (file.EndsWith("_unsaved.sbc"))
+                        {
+                            File.Move(file, file.Replace("_unsaved.sbc", ".sbc"));
+                        }
+
+                        if (file.EndsWith("_spawned_unsaved"))
+                        {
+                            var newFile = file.Replace("_spawned_unsaved", "_spawned");
+                            if (File.Exists(newFile))
+                                File.Delete(newFile);
+                            File.Move(file, newFile);
+                        }
+                    }
+                }
+            });
         }
 
         private void CheckAllGrids(IEnumerable<MyCubeGrid> myCubeGrids, List<MyIdentity> PlayersList)

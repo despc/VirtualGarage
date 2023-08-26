@@ -299,9 +299,10 @@ namespace VirtualGarage
                                 {
                                     try
                                     {
-                                        if (File.Exists(str + "_spawned"))
-                                            File.Delete(str + "_spawned");
-                                        File.Move(str, str + "_spawned");
+                                        var spawnedSuffix = "_spawned_unsaved";
+                                        if (File.Exists(str + spawnedSuffix))
+                                            File.Delete(str + spawnedSuffix);
+                                        File.Move(str, str + spawnedSuffix);
                                         break;
                                     }
                                     catch (Exception e)

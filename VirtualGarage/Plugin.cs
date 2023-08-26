@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Windows.Controls;
 using NLog;
 using Sandbox.Game.Entities.Blocks;
+using Sandbox.Game.World;
 using Torch;
 using Torch.API;
 using Torch.API.Managers;
@@ -36,9 +37,14 @@ namespace VirtualGarage
             _sessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (_sessionManager == null)
                 return;
-
+            MySession.OnSaved += OnSaved;
             _sessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
             m_myProgrammableBlockKillProgramm = typeof(MyProgrammableBlock).GetMethod("OnProgramTermination", BindingFlags.Instance | BindingFlags.NonPublic);
+        }
+
+        private void OnSaved(bool arg1, string arg2)
+        {
+            VirtualGarageOldGridProcessor.OldGridProcessor.OnSaved();
         }
 
         private void SessionManager_SessionStateChanged(ITorchSession session, TorchSessionState newState)

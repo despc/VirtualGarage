@@ -232,7 +232,7 @@ namespace VirtualGarage
                 filenameexported = filenameexported.Replace(ch.ToString(), ".");
             }
 
-            string path = Path.Combine(str, filenameexported + new Random().Next(1000, 9999) + ".sbc");
+            string path = Path.Combine(str, filenameexported + new Random().Next(1000, 9999) + "_unsaved.sbc");
             Task.Run(() =>
             {
                 if (MyObjectBuilderSerializer.SerializeXML(path, false, newObject2))
