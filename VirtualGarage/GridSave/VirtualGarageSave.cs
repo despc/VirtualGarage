@@ -18,6 +18,7 @@ using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using VRage.ObjectBuilders;
+using VRage.ObjectBuilders.Private;
 using VRage.Utils;
 using VRageMath;
 
@@ -211,7 +212,7 @@ namespace VirtualGarage
                 : gridsOB[0].DisplayName.Substring(0, 30);
             string filenameexported = gridName + "_" + DateTime.Now.ToShortDateString() + "_" + DateTime.Now.ToShortTimeString() + "_P-" + totalpcu + "_B-" + totalblocks;
 
-            MyObjectBuilder_ShipBlueprintDefinition newObject1 = MyObjectBuilderSerializer.CreateNewObject<MyObjectBuilder_ShipBlueprintDefinition>();
+            MyObjectBuilder_ShipBlueprintDefinition newObject1 = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_ShipBlueprintDefinition>();
             newObject1.Id = new MyDefinitionId(new MyObjectBuilderType(typeof(MyObjectBuilder_ShipBlueprintDefinition)), MyUtils.StripInvalidChars(filenameexported));
             newObject1.DLCs = GetDLCs(newObject1.CubeGrids);
             newObject1.CubeGrids = gridsOB.ToArray();
@@ -219,7 +220,7 @@ namespace VirtualGarage
             newObject1.DisplayName = MyGameService.UserName;
             newObject1.OwnerSteamId = Sync.MyId;
             newObject1.CubeGrids[0].DisplayName = myCubeGridList.FirstOrDefault().DisplayName;
-            MyObjectBuilder_Definitions newObject2 = MyObjectBuilderSerializer.CreateNewObject<MyObjectBuilder_Definitions>();
+            MyObjectBuilder_Definitions newObject2 = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_Definitions>();
             newObject2.ShipBlueprints = new MyObjectBuilder_ShipBlueprintDefinition[1];
             newObject2.ShipBlueprints[0] = newObject1;
 
@@ -235,8 +236,8 @@ namespace VirtualGarage
             string path = Path.Combine(str, filenameexported + new Random().Next(1000, 9999) + "_unsaved.sbc");
             Task.Run(() =>
             {
-                if (MyObjectBuilderSerializer.SerializeXML(path, false, newObject2))
-                    MyObjectBuilderSerializer.SerializePB(path + "B5", true, newObject2);
+                if (MyObjectBuilderSerializerKeen.SerializeXML(path, false, newObject2))
+                    MyObjectBuilderSerializerKeen.SerializePB(path + "B5", true, newObject2);
                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
                     foreach (MyEntity myEntity in myCubeGridList)
@@ -314,7 +315,7 @@ namespace VirtualGarage
                 : gridsOB[0].DisplayName.Substring(0, 30);
             string filenameexported = gridName  + "_" + DateTime.Now.ToShortDateString() + "_" + DateTime.Now.ToShortTimeString() + "_P-" + totalpcu + "_B-" + totalblocks;
 
-            MyObjectBuilder_ShipBlueprintDefinition newObject1 = MyObjectBuilderSerializer.CreateNewObject<MyObjectBuilder_ShipBlueprintDefinition>();
+            MyObjectBuilder_ShipBlueprintDefinition newObject1 = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_ShipBlueprintDefinition>();
             newObject1.Id = new MyDefinitionId(new MyObjectBuilderType(typeof(MyObjectBuilder_ShipBlueprintDefinition)), MyUtils.StripInvalidChars(filenameexported));
             newObject1.DLCs = GetDLCs(newObject1.CubeGrids);
             newObject1.CubeGrids = gridsOB.ToArray();
@@ -322,7 +323,7 @@ namespace VirtualGarage
             newObject1.DisplayName = MyGameService.UserName;
             newObject1.OwnerSteamId = Sync.MyId;
             newObject1.CubeGrids[0].DisplayName = myCubeGridList.FirstOrDefault().DisplayName;
-            MyObjectBuilder_Definitions newObject2 = MyObjectBuilderSerializer.CreateNewObject<MyObjectBuilder_Definitions>();
+            MyObjectBuilder_Definitions newObject2 = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_Definitions>();
             newObject2.ShipBlueprints = new MyObjectBuilder_ShipBlueprintDefinition[1];
             newObject2.ShipBlueprints[0] = newObject1;
 
@@ -336,8 +337,8 @@ namespace VirtualGarage
             }
 
             string path = Path.Combine(str, filenameexported + ".sbc");
-            if (MyObjectBuilderSerializer.SerializeXML(path, false, newObject2))
-                MyObjectBuilderSerializer.SerializePB(path + "B5", true, newObject2);
+            if (MyObjectBuilderSerializerKeen.SerializeXML(path, false, newObject2))
+                MyObjectBuilderSerializerKeen.SerializePB(path + "B5", true, newObject2);
 
             MyAPIGateway.Utilities.InvokeOnGameThread(() =>
             {
