@@ -28,9 +28,7 @@ namespace VirtualGarage
                 {
                     Log.Error("Fixship after garage error ", e);
                 }
-                
             });
-
         }
 
         public static List<MyCubeGrid> FindLookAtGridGroup(MyCubeGrid grid)
@@ -74,15 +72,12 @@ namespace VirtualGarage
 
             foreach (MyCubeGrid myCubeGrid in myCubeGridList)
             {
-                IMyEntity myEntity = (IMyEntity) myCubeGrid;
-                Log.Warn("Player used ShipFixerPlugin from COCK on Grid " +
-                         myCubeGrid.DisplayName + " for cut & paste!");
-
+                IMyEntity myEntity = myCubeGrid;
+                Log.Info($"Fixship after spawn from garage {myCubeGrid.DisplayName}");
                 myEntity.Close();
             }
 
-            MyAPIGateway.Entities.RemapObjectBuilderCollection(
-                (IEnumerable<MyObjectBuilder_EntityBase>) objectBuilders);
+            MyAPIGateway.Entities.RemapObjectBuilderCollection(objectBuilders);
             foreach (MyObjectBuilder_EntityBase cubeGrid in objectBuilders)
                 
                 MyAPIGateway.Entities.CreateFromObjectBuilderParallel(cubeGrid,

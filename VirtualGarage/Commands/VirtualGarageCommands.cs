@@ -26,6 +26,11 @@ namespace VirtualGarage
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
+        private int saveCooldown = 10;
+        private int loadCooldown = 10;
+        public static Dictionary<ulong, DateTime> CooldownSave = new Dictionary<ulong, DateTime>();
+        public static Dictionary<ulong, DateTime> CooldownLoad = new Dictionary<ulong, DateTime>();
+        
         [Command("list", "List grids in garage.", null)]
         [Permission(MyPromoteLevel.None)]
         public void List()
@@ -81,6 +86,18 @@ namespace VirtualGarage
         [Permission(MyPromoteLevel.None)]
         public void SaveGridToStorage(string gridName = "")
         {
+            var playerSteamUserId = Context.Player.SteamUserId;
+            if (CooldownSave.TryGetValue(playerSteamUserId, out DateTime lastCall))
+            {
+                
+                if (lastCall.AddSeconds(saveCooldown) > DateTime.Now)
+                {
+                    Context.Respond($"try again after {saveCooldown} sec", (string) null,
+                        (string) null);
+                    return;
+                }
+            }
+            CooldownSave[Context.Player.SteamUserId] = DateTime.Now; 
             DoSaveGrid(gridName);
         }
 
@@ -144,6 +161,18 @@ namespace VirtualGarage
         [Permission(MyPromoteLevel.None)]
         public void Load(int index, bool spawnDynamic = false, bool loadbase = false)
         {
+            var playerSteamUserId = Context.Player.SteamUserId;
+            if (CooldownLoad.TryGetValue(playerSteamUserId, out DateTime lastCall))
+            {
+                
+                if (lastCall.AddSeconds(loadCooldown) > DateTime.Now)
+                {
+                    Context.Respond($"try again after {loadCooldown} sec", (string) null,
+                        (string) null);
+                    return;
+                }
+            }
+            CooldownLoad[Context.Player.SteamUserId] = DateTime.Now; 
             if (Plugin.Instance.Config.OnlyLoadBase)
             {
                 loadbase = true;
