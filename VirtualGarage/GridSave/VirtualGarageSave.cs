@@ -29,7 +29,7 @@ namespace VirtualGarage
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static VirtualGarageSave Instance = new VirtualGarageSave();
 
-        public void SaveGrid(IMyCharacter character, long identityId, string gridName, CommandContext context = null)
+        public void SaveGrid(IMyCharacter character, long identityId, string gridName, CommandContext context = null, bool isAdminSave = false)
         {
             var IsItSaved = false;
             MyCubeGrid SelectedGrid = null;
@@ -63,8 +63,25 @@ namespace VirtualGarage
 
                     GridsGroup = MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Mechanical).GetGroupNodes((MyCubeGrid)IEntity);
 
-                    if (SaveGridToVirtualGarage(identityId, GridsGroup, context))
+                    context.Player.TryGetBalanceInfo(out long balance);
+                    int pcu = 0;
+                    foreach (var myCubeGrid in GridsGroup)
                     {
+                        pcu = pcu + myCubeGrid.BlocksPCU;
+                    }
+                    var cost = pcu * Plugin.Instance.Config.SavePcuCost;
+                    if (!isAdminSave && balance < cost)
+                    {
+                        context.Respond(Plugin.Instance.Config.NotEnoughMoneyMessage);
+                        return;
+                    }
+                    
+                    if (SaveGridToVirtualGarage(identityId, GridsGroup, context, isAdminSave))
+                    {
+                        if (!isAdminSave)
+                        {
+                            context.Player.RequestChangeBalance(-cost);
+                        }
                         IsItSaved = true;
                         LastGrid = (MyCubeGrid)IEntity;
                     }
@@ -106,14 +123,17 @@ namespace VirtualGarage
                             pcu = pcu + myCubeGrid.BlocksPCU;
                         }
                         var cost = pcu * Plugin.Instance.Config.SavePcuCost;
-                        if (balance < cost)
+                        if (!isAdminSave && balance < cost)
                         {
                             context.Respond(Plugin.Instance.Config.NotEnoughMoneyMessage);
                             return;
                         }
-                        if (SaveGridToVirtualGarage(identityId, GridsGroup, context))
+                        if (SaveGridToVirtualGarage(identityId, GridsGroup, context, isAdminSave))
                         {
-                            context.Player.RequestChangeBalance(-cost);
+                            if (!isAdminSave)
+                            {
+                                context.Player.RequestChangeBalance(-cost);
+                            }
                             IsItSaved = true;
                             if (grid.BlocksCount > 100)
                                 LastGrid = grid;
@@ -129,17 +149,17 @@ namespace VirtualGarage
                 context?.Respond(Plugin.Instance.Config.NoGridInViewResponce);
         }
 
-        public bool SaveGridToVirtualGarage(long identityId, List<MyCubeGrid> myCubeGridList, CommandContext context = null)
+        public bool SaveGridToVirtualGarage(long identityId, List<MyCubeGrid> myCubeGridList, CommandContext context = null, bool isAdminSave = false)
         {
             // check ownership
-            if (myCubeGridList.FirstOrDefault().BigOwners.Count > 0 && !myCubeGridList.FirstOrDefault().BigOwners.Contains(identityId))
+            if (!isAdminSave && myCubeGridList.FirstOrDefault().BigOwners.Count > 0 && !myCubeGridList.FirstOrDefault().BigOwners.Contains(identityId))
             {
                 context?.Respond($"{Plugin.Instance.Config.OnlyOwnerCanSaveResponce} " + myCubeGridList.FirstOrDefault().DisplayName);
                 return false;
             }
 
             // check distance from player to grid.
-            if (Vector3D.DistanceSquared(myCubeGridList.FirstOrDefault().PositionComp.GetPosition(), context.Player.Character.GetPosition()) > Plugin.Instance.Config.MaxRangeToGrid * Plugin.Instance.Config.MaxRangeToGrid)
+            if (!isAdminSave && Vector3D.DistanceSquared(myCubeGridList.FirstOrDefault().PositionComp.GetPosition(), context.Player.Character.GetPosition()) > Plugin.Instance.Config.MaxRangeToGrid * Plugin.Instance.Config.MaxRangeToGrid)
             {
                 context?.Respond($"{Plugin.Instance.Config.GridToFarResponce} " + myCubeGridList.FirstOrDefault().DisplayName);
                 return false;
@@ -152,12 +172,21 @@ namespace VirtualGarage
             int totalpcu = 0;
             int totalblocks = 0;
             List<MyObjectBuilder_CubeGrid> gridsOB = new List<MyObjectBuilder_CubeGrid>();
-
+            long owner = 0;
+            int blockSize = 0;
             foreach (MyCubeGrid сubeGrid in myCubeGridList)
             {
                 totalpcu += сubeGrid.BlocksPCU;
-                totalblocks += сubeGrid.BlocksCount;
-
+                var сubeGridBlocksCount = сubeGrid.BlocksCount;
+                totalblocks += сubeGridBlocksCount;
+                if (сubeGridBlocksCount > blockSize)
+                {
+                    blockSize = сubeGridBlocksCount;
+                    if (сubeGrid.BigOwners.Count > 0)
+                    {
+                        owner = сubeGrid.BigOwners[0];
+                    }
+                }
                 try
                 {
                     foreach (MyCubeBlock fatBlock in сubeGrid.GetFatBlocks())
@@ -195,13 +224,13 @@ namespace VirtualGarage
                 gridsOB.Add(objectBuilder);
             }
 
-            if (totalpcu > Plugin.Instance.Config.MaxPCUForGridOnSave)
+            if (!isAdminSave && totalpcu > Plugin.Instance.Config.MaxPCUForGridOnSave)
             {
                 context?.Respond(Plugin.Instance.Config.GridPCUOverLimitResponce);
                 return false;
             }
 
-            if (totalblocks > Plugin.Instance.Config.MaxBlocksForGridOnSave)
+            if (!isAdminSave && totalblocks > Plugin.Instance.Config.MaxBlocksForGridOnSave)
             {
                 context?.Respond(Plugin.Instance.Config.GridBlocksOverLimitResponce);
                 return false;
@@ -223,12 +252,21 @@ namespace VirtualGarage
             MyObjectBuilder_Definitions newObject2 = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_Definitions>();
             newObject2.ShipBlueprints = new MyObjectBuilder_ShipBlueprintDefinition[1];
             newObject2.ShipBlueprints[0] = newObject1;
+            if (isAdminSave)
+            {
+                if (owner == 0)
+                {
+                    context?.Respond($"Чёт не нашли владельца для {myCubeGridList.FirstOrDefault().DisplayName}");
+                    return false;  
+                }
 
+                identityId = owner;
+            }
             string str = Path.Combine(pathToVirtualGarage, MyAPIGateway.Players.TryGetSteamId(identityId).ToString());
             if (!Directory.Exists(str))
                 Directory.CreateDirectory(str);
 
-            foreach (char ch in ((IEnumerable<char>)Path.GetInvalidPathChars()).Concat(Path.GetInvalidFileNameChars()))
+            foreach (char ch in Path.GetInvalidPathChars().Concat(Path.GetInvalidFileNameChars()))
             {
                 filenameexported = filenameexported.Replace(ch.ToString(), ".");
             }

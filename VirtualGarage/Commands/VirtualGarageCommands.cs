@@ -100,12 +100,27 @@ namespace VirtualGarage
             CooldownSave[Context.Player.SteamUserId] = DateTime.Now; 
             DoSaveGrid(gridName);
         }
+        
+        [Command("a_save", "Save any grid by looking at its position", null)]
+        [Permission(MyPromoteLevel.Admin)]
+        public void AdminSaveGridToStorage(string gridName = "")
+        {
+            DoSaveGrid(gridName, true);
+        }
 
-        private void DoSaveGrid(string gridName)
+        private void DoSaveGrid(string gridName, bool isAdminSave = false)
         {
             IMyPlayer player = Context.Player;
             if (player == null)
                 return;
+            
+            if (isAdminSave)
+            {
+                Log.Warn("VirtualGarage:" + Context.Player.DisplayName + " send *!g a_save " +
+                         gridName + "*");
+                VirtualGarageSave.Instance.SaveGrid(player.Character, player.IdentityId, gridName, Context, true);
+                return;
+            }
             List<IMyPlayer> players = new List<IMyPlayer>();
             MyAPIGateway.Players.GetPlayers(players);
             
@@ -120,6 +135,7 @@ namespace VirtualGarage
                     string.Format("{0} > {1}",
                         Plugin.Instance.Config.VirtualGarageNotAllowedInGravityMoreThanResponce,
                         Plugin.Instance.Config.MinAllowedGravityToLoad));
+                return;
             }
             
             foreach (IMyPlayer myPlayer in players)
