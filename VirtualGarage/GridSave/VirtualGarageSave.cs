@@ -294,18 +294,26 @@ namespace VirtualGarage
             int totalblocks = 0;
             List<MyObjectBuilder_CubeGrid> gridsOB = new List<MyObjectBuilder_CubeGrid>();
 
+            List<long> allOwners = new List<long>();
+            foreach (MyCubeGrid сubeGrid in myCubeGridList)
+            {
+
+                var bigOwners = сubeGrid.BigOwners;
+                if (bigOwners != null)
+                {
+                    allOwners.AddRange(bigOwners);
+                }
+            }
+
+            if (!AllOwnersOld(allOwners))
+            {
+                return false;
+            }
+            
             foreach (MyCubeGrid сubeGrid in myCubeGridList)
             {
                 
                 var bigOwners = сubeGrid.BigOwners;
-                if (bigOwners != null)
-                {
-                    if (!AllOwnersOld(bigOwners))
-                    {
-                        continue;
-                    }
-                }
-
                 var owner = bigOwners.FirstOrDefault();
 
                 totalpcu += сubeGrid.BlocksPCU;
