@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Пример настроек VirtualGarage со значениями по умолчанию.
+  Файл сервера: Instance\VirtualGarage.cfg (Torch создаёт его при первом запуске).
+  Этот файл можно скопировать туда как есть: комментарии при чтении пропускаются.
+  Параметр, которого нет в файле, берёт значение по умолчанию.
+  Подробности: README.md.
+-->
+<Config xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <!-- Ответ игроку, которому не хватает кредитов на уборку грида в гараж (SavePcuCost). -->
+  <NotEnoughMoneyMessage>Not enough money!</NotEnoughMoneyMessage>
+
+  <!-- Выше этой гравитации (в g) гаражом пользоваться нельзя: ни !g save, ни !g load. На !g loadbase
+       не действует - грид возвращается туда, где стоял. -->
+  <MinAllowedGravityToLoad>0.4</MinAllowedGravityToLoad>
+
+  <!-- При доставании делать достающего строителем (BuiltBy) всех блоков. -->
+  <ChangeBuiltBy>false</ChangeBuiltBy>
+
+  <!-- При доставании отдавать достающему блоки, у которых есть владелец (с доступом «для фракции»). -->
+  <ChangeOwner>false</ChangeOwner>
+
+  <!-- Большой главный грид всегда достаётся статичным. Главнее ConvertToDynamic. -->
+  <ConvertToStatic>false</ConvertToStatic>
+
+  <!-- Большой главный грид всегда достаётся динамическим. Игрок может попросить динамику и сам:
+       !g load N true. -->
+  <ConvertToDynamic>false</ConvertToDynamic>
+
+  <!-- !g load работает как !g loadbase: грид возвращается только туда, откуда его убрали. -->
+  <OnlyLoadBase>false</OnlyLoadBase>
+
+  <!-- В каком радиусе от игрока !g load ищет свободное место для грида, м. -->
+  <MaxSpawnRadius>300</MaxSpawnRadius>
+
+  <!-- Как далеко от игрока может быть грид, который он убирает в гараж, м. -->
+  <MaxRangeToGrid>1000</MaxRangeToGrid>
+
+  <!-- Гриды игроков, которые не заходили столько дней и больше, при загрузке мира уходят в их гаражи.
+       0 - выключено. -->
+  <OldGridDays>0</OldGridDays>
+
+  <!-- Цена уборки в гараж за 1 PCU, в кредитах. Доставать всегда бесплатно. 0 - бесплатно. -->
+  <SavePcuCost>0</SavePcuCost>
+
+  <!-- Максимум PCU у группы, которую игрок убирает в гараж. -->
+  <MaxPCUForGridOnSave>300000</MaxPCUForGridOnSave>
+
+  <!-- Максимум блоков у группы, которую игрок убирает в гараж. -->
+  <MaxBlocksForGridOnSave>30000</MaxBlocksForGridOnSave>
+
+  <!-- Гаражом нельзя пользоваться, если вражеский игрок ближе стольких метров. -->
+  <EnemyPlayerInRange>3000</EnemyPlayerInRange>
+
+  <!-- Папка гаража: абсолютный путь или относительно папки сервера. Внутри - папка на Steam ID
+       каждого игрока с файлами .sbc. -->
+  <PathToVirtualGarage>Garage</PathToVirtualGarage>
+
+  <!-- ============================ Тексты ответов игрокам ============================ -->
+
+  <!-- Игрок пытается убрать чужой грид (или грид без владельца). -->
+  <OnlyOwnerCanSaveResponce>Only grid owner can save to garage.</OnlyOwnerCanSaveResponce>
+
+  <!-- Уборка началась. -->
+  <SavingGridResponce>Saving grid to garage now</SavingGridResponce>
+
+  <!-- Больше MaxBlocksForGridOnSave блоков. -->
+  <GridBlocksOverLimitResponce>Cant save grid to garage, too many blocks!</GridBlocksOverLimitResponce>
+
+  <!-- Больше MaxPCUForGridOnSave PCU. -->
+  <GridPCUOverLimitResponce>Cant save grid to garage, too much PCU!</GridPCUOverLimitResponce>
+
+  <!-- Грид убран в гараж. -->
+  <GridSavedToVirtualGarageResponce>Saved to garage!</GridSavedToVirtualGarageResponce>
+
+  <!-- Враг ближе EnemyPlayerInRange. -->
+  <EnemyNearByChatRespond>Cant use garage! Enemy player near by!</EnemyNearByChatRespond>
+
+  <!-- Гравитация больше MinAllowedGravityToLoad (к тексту дописывается порог). -->
+  <VirtualGarageNotAllowedInGravityMoreThanResponce>Cant use garage in gravity more than</VirtualGarageNotAllowedInGravityMoreThanResponce>
+
+  <!-- Грид достан (к тексту дописывается имя грида). -->
+  <GridSpawnedToWorldRespond>Spawned grid to World</GridSpawnedToWorldRespond>
+
+  <!-- Для !g load не нашлось свободного места в MaxSpawnRadius. -->
+  <NoRoomToSpawnRespond>No place to spawn grid, find better location.</NoRoomToSpawnRespond>
+
+  <!-- Гараж игрока пуст. -->
+  <NoGridsInVirtualGarageRespond>No grids found in garage!</NoGridsInVirtualGarageRespond>
+
+  <!-- Заголовок списка !g list. -->
+  <GridsInVirtualGarageRespond>List of your grid in garage.</GridsInVirtualGarageRespond>
+
+  <!-- !g save без имени, а игрок ни на какой грид не смотрит. -->
+  <NoGridInViewResponce>There is no grid in view</NoGridInViewResponce>
+
+  <!-- Грид дальше MaxRangeToGrid. -->
+  <GridToFarResponce>Grid is too far from you!</GridToFarResponce>
+
+</Config>
