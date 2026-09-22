@@ -14,11 +14,10 @@ namespace VirtualGarage
         private bool _ConvertToDynamic;
         private bool _OnlyLoadBase;
 
-        private float _MaxSpawnRadius = 500;
+        private float _MaxSpawnRadius = 300;
         private float _MaxRangeToGrid = 1000;
 
-        private int _OldGridDays = 7;
-        private int _LoadPcuCost = 0;
+        private int _OldGridDays = 0;
         private int _SavePcuCost = 0;
         private int _MaxPCUForGridOnSave = 300000;
         private int _MaxBlocksForGridOnSave = 30000;
@@ -96,13 +95,6 @@ namespace VirtualGarage
             set => SetValue(ref _MaxSpawnRadius, value);
         }
         
-        [DisplayTab(Name = "Load cost for 1 PCU", GroupName = "Load settings", Tab = "Load settings", Order = 0, Description = "Load cost for 1 PCU")]
-        public int LoadPcuCost
-        {
-            get => _LoadPcuCost;
-            set => SetValue(ref _LoadPcuCost, value);
-        }
-
         [DisplayTab(Name = "Max range to grid", GroupName = "Save settings", Tab = "Save settings", Order = 0, Description = "Max range to grid")]
         public float MaxRangeToGrid
         {
@@ -110,14 +102,14 @@ namespace VirtualGarage
             set => SetValue(ref _MaxRangeToGrid, value);
         }
 
-        [DisplayTab(Name = "Move grids to garage after player offline days", GroupName = "Save settings", Tab = "Save settings", Order = 0, Description = "Move grids to garage after player offline days")]
+        [DisplayTab(Name = "Move grids to garage after player offline days", GroupName = "Save settings", Tab = "Save settings", Order = 0, Description = "Move grids to garage after player offline days; 0 - off")]
         public int OldGridDays
         {
             get => _OldGridDays;
             set => SetValue(ref _OldGridDays, value);
         }
         
-        [DisplayTab(Name = "Save cost for 1 PCU", GroupName = "Save settings", Tab = "Save settings", Order = 0, Description = "Save cost for 1 PCU")]
+        [DisplayTab(Name = "Save cost for 1 PCU", GroupName = "Save settings", Tab = "Save settings", Order = 0, Description = "Save cost for 1 PCU; taking a grid out is free")]
         public int SavePcuCost
         {
             get => _SavePcuCost;

@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using NLog;
@@ -14,9 +13,7 @@ using Sandbox.Game.Weapons;
 using Sandbox.ModAPI;
 using Torch.Commands;
 using VRage.Game;
-using VRage.Game.Entity;
 using VRage.Game.ModAPI;
-using VRage.ModAPI;
 using VRage.ObjectBuilders;
 using VRage.ObjectBuilders.Private;
 using VRage.Utils;
@@ -24,418 +21,258 @@ using VRageMath;
 
 namespace VirtualGarage
 {
+    /// <summary>
+    /// Putting grids into the garage: a player's (!g save, !g a_save) and the grids of players gone
+    /// for too long (<see cref="VirtualGarageOldGridProcessor"/>).
+    ///
+    /// A grid is taken with everything joined to it by rotors, pistons and hinges. Its copy is made
+    /// and the grids are removed in the same frame - nothing can be taken out of a cargo container
+    /// between the two - and the file is written in the background. Should writing fail, the grids
+    /// come back where they were.
+    /// </summary>
     public class VirtualGarageSave
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public static VirtualGarageSave Instance = new VirtualGarageSave();
 
-        public void SaveGrid(IMyCharacter character, long identityId, string gridName, CommandContext context = null, bool isAdminSave = false)
+        /// <summary>!g save / !g a_save: the grid named, or the one the player looks at.</summary>
+        public void SaveGrid(IMyCharacter character, long identityId, string gridName, CommandContext context, bool isAdminSave = false)
         {
-            var IsItSaved = false;
-            MyCubeGrid SelectedGrid = null;
-            MyCubeGrid LastGrid = null;
-            Matrix headMatrix = character.GetHeadMatrix(true, true, false);
-            Vector3D vector3D = headMatrix.Translation + headMatrix.Forward * 0.5f;
-            Vector3D worldEnd = headMatrix.Translation + headMatrix.Forward * 5000.5f;
-            List<MyPhysics.HitInfo> mRaycastResult = new List<MyPhysics.HitInfo>();
-            HashSet<IMyEntity> GridSets = new HashSet<IMyEntity>();
-            List<MyCubeGrid> GridsGroup;
-
-            if (gridName != string.Empty)
+            var config = Plugin.Instance.Config;
+            foreach (var group in Candidates(character, gridName))
             {
-                MyAPIGateway.Entities.GetEntities(GridSets, (IMyEntity Entity) => Entity is IMyCubeGrid && Entity.DisplayName.Equals(gridName, StringComparison.InvariantCultureIgnoreCase) && !((MyCubeGrid)Entity).IsPreview);
-                if (!GridSets.Any())
+                var main = group[0];
+                var why = isAdminSave ? null : WhyNot(group, identityId, character);
+                if (why != null)
                 {
-                    context.Respond("No such grid exist with name '" + gridName + "' .", "VirtualGarage", "Red");
-                    return;
+                    context.Respond(why + " " + main.DisplayName);
+                    // a grid that may not be saved hides nothing: look at the next one behind it
+                    continue;
                 }
-                foreach (var IEntity in GridSets)
+
+                var owner = identityId;
+                if (isAdminSave)
                 {
-                    if (IEntity is null)
-                        continue;
-
-                    // reset velocity
-                    if (IEntity.Physics != null)
+                    owner = OwnerOf(group);
+                    if (owner == 0)
                     {
-                        IEntity.Physics.AngularVelocity = new Vector3();
-                        IEntity.Physics.LinearVelocity = new Vector3();
-                    }
-
-                    GridsGroup = MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Mechanical).GetGroupNodes((MyCubeGrid)IEntity);
-
-                    context.Player.TryGetBalanceInfo(out long balance);
-                    int pcu = 0;
-                    foreach (var myCubeGrid in GridsGroup)
-                    {
-                        pcu = pcu + myCubeGrid.BlocksPCU;
-                    }
-                    var cost = pcu * Plugin.Instance.Config.SavePcuCost;
-                    if (!isAdminSave && balance < cost)
-                    {
-                        context.Respond(Plugin.Instance.Config.NotEnoughMoneyMessage);
+                        context.Respond("No owner found for " + main.DisplayName);
                         return;
                     }
-                    
-                    if (SaveGridToVirtualGarage(identityId, GridsGroup, context, isAdminSave))
-                    {
-                        if (!isAdminSave)
-                        {
-                            context.Player.RequestChangeBalance(-cost);
-                        }
-                        IsItSaved = true;
-                        LastGrid = (MyCubeGrid)IEntity;
-                    }
-                    break;
                 }
-            }
-            else
-            {
-                MyPhysics.CastRay(vector3D, worldEnd, mRaycastResult, 15);
 
-                foreach (var hitInfo in new HashSet<MyPhysics.HitInfo>(mRaycastResult))
+                var pcu = group.Sum(g => g.BlocksPCU);
+                var cost = (long)pcu * config.SavePcuCost;
+                if (!isAdminSave && cost > 0)
                 {
-                    if (hitInfo.HkHitInfo.GetHitEntity() is MyCubeGrid grid)
+                    context.Player.TryGetBalanceInfo(out var balance);
+                    if (balance < cost)
                     {
-                        if (grid is null)
-                            continue;
-
-                        // ignore projected grid.
-                        if (grid.IsPreview)
-                            continue;
-
-                        // make sure not to run again on same grid, mRaycastResult contains atleast 6 times same grid, why KEEN why!
-                        if (SelectedGrid != null && SelectedGrid.EntityId == grid.EntityId)
-                            continue;
-
-                        // reset velocity
-                        if (grid.Physics != null)
-                        {
-                            grid.Physics.AngularVelocity = new Vector3();
-                            grid.Physics.LinearVelocity = new Vector3();
-                        }
-
-                        GridsGroup = MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Mechanical).GetGroupNodes(grid);
-                        
-                        context.Player.TryGetBalanceInfo(out long balance);
-                        int pcu = 0;
-                        foreach (var myCubeGrid in GridsGroup)
-                        {
-                            pcu = pcu + myCubeGrid.BlocksPCU;
-                        }
-                        var cost = pcu * Plugin.Instance.Config.SavePcuCost;
-                        if (!isAdminSave && balance < cost)
-                        {
-                            context.Respond(Plugin.Instance.Config.NotEnoughMoneyMessage);
-                            return;
-                        }
-                        if (SaveGridToVirtualGarage(identityId, GridsGroup, context, isAdminSave))
-                        {
-                            if (!isAdminSave)
-                            {
-                                context.Player.RequestChangeBalance(-cost);
-                            }
-                            IsItSaved = true;
-                            if (grid.BlocksCount > 100)
-                                LastGrid = grid;
-                            break;
-                        }
+                        context.Respond(config.NotEnoughMoneyMessage);
+                        return;
                     }
                 }
-            }
 
-            if (IsItSaved)
-                context?.Respond("Grid/Cтруктура " + LastGrid?.DisplayName + $" {Plugin.Instance.Config.GridSavedToVirtualGarageResponce}");
-            else
-                context?.Respond(Plugin.Instance.Config.NoGridInViewResponce);
+                context.Respond(config.SavingGridResponce + " " + main.DisplayName);
+                if (Store(owner, group) == null)
+                {
+                    context.Respond("Could not save " + main.DisplayName);
+                    return;
+                }
+                if (!isAdminSave && cost > 0) context.Player.RequestChangeBalance(-cost);
+                context.Respond("Grid/Cтруктура " + main.DisplayName + " " + config.GridSavedToVirtualGarageResponce);
+                return;
+            }
+            context.Respond(gridName != string.Empty
+                ? "No such grid exist with name '" + gridName + "' ."
+                : config.NoGridInViewResponce);
         }
 
-        public bool SaveGridToVirtualGarage(long identityId, List<MyCubeGrid> myCubeGridList, CommandContext context = null, bool isAdminSave = false)
+        /// <summary>The groups to try, nearest first: the grids with that name, or those on the player's line of sight.</summary>
+        private static IEnumerable<List<MyCubeGrid>> Candidates(IMyCharacter character, string gridName)
         {
-            // check ownership
-            if (!isAdminSave && myCubeGridList.FirstOrDefault().BigOwners.Count > 0 && !myCubeGridList.FirstOrDefault().BigOwners.Contains(identityId))
+            var seen = new HashSet<MyCubeGrid>();
+            IEnumerable<MyCubeGrid> grids;
+            if (gridName != string.Empty)
             {
-                context?.Respond($"{Plugin.Instance.Config.OnlyOwnerCanSaveResponce} " + myCubeGridList.FirstOrDefault().DisplayName);
-                return false;
+                grids = MyEntities.GetEntities().OfType<MyCubeGrid>()
+                    .Where(g => !g.IsPreview && !g.MarkedForClose && g.DisplayName.Equals(gridName, StringComparison.InvariantCultureIgnoreCase))
+                    .OrderBy(g => Vector3D.DistanceSquared(g.PositionComp.GetPosition(), character.GetPosition()))
+                    .ToList();
+            }
+            else
+            {
+                var head = character.GetHeadMatrix(true, true, false);
+                var from = head.Translation + head.Forward * 0.5f;
+                var to = head.Translation + head.Forward * 5000.5f;
+                var hits = new List<MyPhysics.HitInfo>();
+                MyPhysics.CastRay(from, to, hits, 15);
+                grids = hits.Select(h => h.HkHitInfo.GetHitEntity() as MyCubeGrid).Where(g => g != null && !g.IsPreview).ToList();
+            }
+            foreach (var grid in grids)
+            {
+                if (!seen.Add(grid)) continue;
+                var group = Group(grid);
+                foreach (var member in group) seen.Add(member);
+                yield return group;
+            }
+        }
+
+        /// <summary>
+        /// Whose garage a group goes to: the owner of its biggest grid, of any grid, or - for a
+        /// group nobody owns (armor only) - whoever built most of its blocks. 0 when nobody.
+        /// </summary>
+        public static long OwnerOf(List<MyCubeGrid> group)
+        {
+            var owner = group[0].BigOwners.FirstOrDefault();
+            if (owner != 0) return owner;
+            owner = group.SelectMany(g => g.BigOwners).FirstOrDefault(o => o != 0);
+            if (owner != 0) return owner;
+            return group.SelectMany(g => g.CubeBlocks).Select(b => b.BuiltBy).Where(b => b != 0)
+                .GroupBy(b => b).OrderByDescending(b => b.Count()).Select(b => b.Key).FirstOrDefault();
+        }
+
+        /// <summary>Everybody the group belongs to: its owners, or its builders when nobody owns it.</summary>
+        public static List<long> PeopleOf(List<MyCubeGrid> group)
+        {
+            var owners = group.SelectMany(g => g.BigOwners).Where(o => o != 0).Distinct().ToList();
+            return owners.Count > 0
+                ? owners
+                : group.SelectMany(g => g.CubeBlocks).Select(b => b.BuiltBy).Where(b => b != 0).Distinct().ToList();
+        }
+
+        /// <summary>A grid and everything joined to it by rotors, pistons and hinges; the biggest first.</summary>
+        public static List<MyCubeGrid> Group(MyCubeGrid grid) =>
+            MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Mechanical).GetGroupNodes(grid)
+                .OrderByDescending(g => g.BlocksCount).ToList();
+
+        /// <summary>Why a player may not put a group into the garage, or null.</summary>
+        private static string WhyNot(List<MyCubeGrid> group, long identityId, IMyCharacter character)
+        {
+            var config = Plugin.Instance.Config;
+            // every grid of the group, not only the first: a player's rotor head on somebody else's ship would take the ship along
+            if (group.Any(g => g.BigOwners.Count > 0 && !g.BigOwners.Contains(identityId)))
+                return config.OnlyOwnerCanSaveResponce;
+            if (group.All(g => g.BigOwners.Count == 0))
+                return config.OnlyOwnerCanSaveResponce;
+            if (Vector3D.DistanceSquared(group[0].PositionComp.GetPosition(), character.GetPosition()) > config.MaxRangeToGrid * config.MaxRangeToGrid)
+                return config.GridToFarResponce;
+            if (group.Sum(g => g.BlocksPCU) > config.MaxPCUForGridOnSave)
+                return config.GridPCUOverLimitResponce;
+            if (group.Sum(g => g.BlocksCount) > config.MaxBlocksForGridOnSave)
+                return config.GridBlocksOverLimitResponce;
+            return null;
+        }
+
+        /// <summary>
+        /// Puts a group into the owner's garage: pilots out, programs stopped, drills off, the copy
+        /// made and the grids removed - on the game thread, in one go - and the file written in the
+        /// background. Returns the file, or null when nothing was done.
+        /// </summary>
+        public static string Store(long ownerIdentityId, List<MyCubeGrid> group)
+        {
+            var steamId = MyAPIGateway.Players.TryGetSteamId(ownerIdentityId);
+            if (steamId == 0)
+            {
+                Log.Warn("Not putting " + group[0].DisplayName + " into the garage: its owner " + ownerIdentityId + " has no Steam id");
+                return null;
             }
 
-            // check distance from player to grid.
-            if (!isAdminSave && Vector3D.DistanceSquared(myCubeGridList.FirstOrDefault().PositionComp.GetPosition(), context.Player.Character.GetPosition()) > Plugin.Instance.Config.MaxRangeToGrid * Plugin.Instance.Config.MaxRangeToGrid)
+            var obs = new List<MyObjectBuilder_CubeGrid>();
+            foreach (var grid in group)
             {
-                context?.Respond($"{Plugin.Instance.Config.GridToFarResponce} " + myCubeGridList.FirstOrDefault().DisplayName);
-                return false;
+                Quiet(grid);
+                obs.Add((MyObjectBuilder_CubeGrid)grid.GetObjectBuilder(true));
             }
+            var pcu = group.Sum(g => g.BlocksPCU);
+            var blocks = group.Sum(g => g.BlocksCount);
+            var file = GarageFiles.NewFile(steamId, group[0].DisplayName, pcu, blocks);
+            var definitions = Blueprint(obs, group[0].DisplayName, file);
+            foreach (var grid in group) grid.Close();
 
-            context?.Respond($"{Plugin.Instance.Config.SavingGridResponce} " + myCubeGridList.FirstOrDefault().DisplayName);
-
-            var pathToVirtualGarage = Plugin.Instance.Config.PathToVirtualGarage;
-
-            int totalpcu = 0;
-            int totalblocks = 0;
-            List<MyObjectBuilder_CubeGrid> gridsOB = new List<MyObjectBuilder_CubeGrid>();
-            long owner = 0;
-            int blockSize = 0;
-            foreach (MyCubeGrid сubeGrid in myCubeGridList)
-            {
-                totalpcu += сubeGrid.BlocksPCU;
-                var сubeGridBlocksCount = сubeGrid.BlocksCount;
-                totalblocks += сubeGridBlocksCount;
-                if (сubeGridBlocksCount > blockSize)
-                {
-                    blockSize = сubeGridBlocksCount;
-                    if (сubeGrid.BigOwners.Count > 0)
-                    {
-                        owner = сubeGrid.BigOwners[0];
-                    }
-                }
-                try
-                {
-                    foreach (MyCubeBlock fatBlock in сubeGrid.GetFatBlocks())
-                    {
-                        MyCubeBlock c = fatBlock;
-                        if (c is MyCockpit)
-                            (c as MyCockpit).RemovePilot();
-
-                        if (c is MyProgrammableBlock)
-                        {
-                            try
-                            {
-                                Plugin.m_myProgrammableBlockKillProgramm.Invoke(
-                                    c as MyProgrammableBlock, new object[1]
-                                    {
-                                         MyProgrammableBlock.ScriptTerminationReason.None
-                                    });
-                            }
-                            catch (Exception ex)
-                            {
-                                Log.Error(ex, "MyProgrammableBlock hack eval");
-                            }
-                        }
-
-                        if (c is MyShipDrill)
-                            (c as MyShipDrill).Enabled = false;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "(SaveGrid)Exception in block disables ex");
-                }
-
-                MyObjectBuilder_CubeGrid objectBuilder = (MyObjectBuilder_CubeGrid)сubeGrid.GetObjectBuilder(true);
-                gridsOB.Add(objectBuilder);
-            }
-
-            if (!isAdminSave && totalpcu > Plugin.Instance.Config.MaxPCUForGridOnSave)
-            {
-                context?.Respond(Plugin.Instance.Config.GridPCUOverLimitResponce);
-                return false;
-            }
-
-            if (!isAdminSave && totalblocks > Plugin.Instance.Config.MaxBlocksForGridOnSave)
-            {
-                context?.Respond(Plugin.Instance.Config.GridBlocksOverLimitResponce);
-                return false;
-            }
-
-            string gridName = gridsOB[0].DisplayName.Length <= 30
-                ? gridsOB[0].DisplayName
-                : gridsOB[0].DisplayName.Substring(0, 30);
-            string filenameexported = gridName + "_" + DateTime.Now.ToShortDateString() + "_" + DateTime.Now.ToShortTimeString() + "_P-" + totalpcu + "_B-" + totalblocks;
-
-            MyObjectBuilder_ShipBlueprintDefinition newObject1 = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_ShipBlueprintDefinition>();
-            newObject1.Id = new MyDefinitionId(new MyObjectBuilderType(typeof(MyObjectBuilder_ShipBlueprintDefinition)), MyUtils.StripInvalidChars(filenameexported));
-            newObject1.DLCs = GetDLCs(newObject1.CubeGrids);
-            newObject1.CubeGrids = gridsOB.ToArray();
-            newObject1.RespawnShip = false;
-            newObject1.DisplayName = MyGameService.UserName;
-            newObject1.OwnerSteamId = Sync.MyId;
-            newObject1.CubeGrids[0].DisplayName = myCubeGridList.FirstOrDefault().DisplayName;
-            MyObjectBuilder_Definitions newObject2 = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_Definitions>();
-            newObject2.ShipBlueprints = new MyObjectBuilder_ShipBlueprintDefinition[1];
-            newObject2.ShipBlueprints[0] = newObject1;
-            if (isAdminSave)
-            {
-                if (owner == 0)
-                {
-                    context?.Respond($"Чёт не нашли владельца для {myCubeGridList.FirstOrDefault().DisplayName}");
-                    return false;  
-                }
-
-                identityId = owner;
-            }
-            string str = Path.Combine(pathToVirtualGarage, MyAPIGateway.Players.TryGetSteamId(identityId).ToString());
-            if (!Directory.Exists(str))
-                Directory.CreateDirectory(str);
-
-            foreach (char ch in Path.GetInvalidPathChars().Concat(Path.GetInvalidFileNameChars()))
-            {
-                filenameexported = filenameexported.Replace(ch.ToString(), ".");
-            }
-
-            string path = Path.Combine(str, filenameexported + new Random().Next(1000, 9999) + "_unsaved.sbc");
             Task.Run(() =>
             {
-                if (MyObjectBuilderSerializerKeen.SerializeXML(path, false, newObject2))
-                    MyObjectBuilderSerializerKeen.SerializePB(path + "B5", true, newObject2);
-                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-                {
-                    foreach (MyEntity myEntity in myCubeGridList)
-                        myEntity.Close();
-                });
-            });
-
-            return true;
-        }
-
-        public bool SaveOldGridToVirtualGarage(long identityId, List<MyCubeGrid> myCubeGridList)
-        {
-            var pathToVirtualGarage = Plugin.Instance.Config.PathToVirtualGarage;
-
-            int totalpcu = 0;
-            int totalblocks = 0;
-            List<MyObjectBuilder_CubeGrid> gridsOB = new List<MyObjectBuilder_CubeGrid>();
-
-            List<long> allOwners = new List<long>();
-            foreach (MyCubeGrid сubeGrid in myCubeGridList)
-            {
-
-                var bigOwners = сubeGrid.BigOwners;
-                if (bigOwners != null)
-                {
-                    allOwners.AddRange(bigOwners);
-                }
-            }
-
-            if (!AllOwnersOld(allOwners))
-            {
-                return false;
-            }
-            
-            foreach (MyCubeGrid сubeGrid in myCubeGridList)
-            {
-                
-                var bigOwners = сubeGrid.BigOwners;
-                var owner = bigOwners.FirstOrDefault();
-
-                totalpcu += сubeGrid.BlocksPCU;
-                totalblocks += сubeGrid.BlocksCount;
-
+                bool written;
                 try
                 {
-                    foreach (MyCubeBlock fatBlock in сubeGrid.GetFatBlocks())
-                    {
-                        MyCubeBlock c = fatBlock;
-                        if (c is MyCockpit)
-                            (c as MyCockpit).RemovePilot();
-
-                        if (c is MyProgrammableBlock)
-                        {
-                            try
-                            {
-                                Plugin.m_myProgrammableBlockKillProgramm.Invoke(
-                                    c as MyProgrammableBlock, new object[1]
-                                    {
-                                         MyProgrammableBlock.ScriptTerminationReason.None
-                                    });
-                            }
-                            catch (Exception ex)
-                            {
-                                Log.Error(ex, "MyProgrammableBlock hack eval");
-                            }
-                        }
-
-                        if (c is MyShipDrill)
-                            (c as MyShipDrill).Enabled = false;
-                    }
+                    // written aside and renamed: the garage shows the file only once it is whole
+                    var partial = file + GarageFiles.Partial;
+                    written = MyObjectBuilderSerializerKeen.SerializeXML(partial, false, definitions);
+                    if (written) GarageFiles.Written(file, partial);
                 }
-                catch (Exception ex)
+                catch (Exception e)
                 {
-                    Log.Error(ex, "(SaveGrid)Exception in block disables ex");
+                    Log.Error(e, "Writing " + file + " failed");
+                    written = false;
                 }
-
-                MyObjectBuilder_CubeGrid objectBuilder = (MyObjectBuilder_CubeGrid)сubeGrid.GetObjectBuilder(true);
-                gridsOB.Add(objectBuilder);
-            }
-
-            string gridName = gridsOB[0].DisplayName.Length <= 30
-                ? gridsOB[0].DisplayName
-                : gridsOB[0].DisplayName.Substring(0, 30);
-            string filenameexported = gridName  + "_" + DateTime.Now.ToShortDateString() + "_" + DateTime.Now.ToShortTimeString() + "_P-" + totalpcu + "_B-" + totalblocks;
-
-            MyObjectBuilder_ShipBlueprintDefinition newObject1 = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_ShipBlueprintDefinition>();
-            newObject1.Id = new MyDefinitionId(new MyObjectBuilderType(typeof(MyObjectBuilder_ShipBlueprintDefinition)), MyUtils.StripInvalidChars(filenameexported));
-            newObject1.DLCs = GetDLCs(newObject1.CubeGrids);
-            newObject1.CubeGrids = gridsOB.ToArray();
-            newObject1.RespawnShip = false;
-            newObject1.DisplayName = MyGameService.UserName;
-            newObject1.OwnerSteamId = Sync.MyId;
-            newObject1.CubeGrids[0].DisplayName = myCubeGridList.FirstOrDefault().DisplayName;
-            MyObjectBuilder_Definitions newObject2 = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_Definitions>();
-            newObject2.ShipBlueprints = new MyObjectBuilder_ShipBlueprintDefinition[1];
-            newObject2.ShipBlueprints[0] = newObject1;
-
-            string str = Path.Combine(pathToVirtualGarage, MyAPIGateway.Players.TryGetSteamId(identityId).ToString());
-            if (!Directory.Exists(str))
-                Directory.CreateDirectory(str);
-
-            foreach (char ch in ((IEnumerable<char>)Path.GetInvalidPathChars()).Concat(Path.GetInvalidFileNameChars()))
-            {
-                filenameexported = filenameexported.Replace(ch.ToString(), ".");
-            }
-
-            string path = Path.Combine(str, filenameexported + ".sbc");
-            if (MyObjectBuilderSerializerKeen.SerializeXML(path, false, newObject2))
-                MyObjectBuilderSerializerKeen.SerializePB(path + "B5", true, newObject2);
-
-            MyAPIGateway.Utilities.InvokeOnGameThread(() =>
-            {
-                foreach (MyEntity myEntity in myCubeGridList)
-                    myEntity.Close();
+                if (written)
+                {
+                    Log.Info("Put into the garage: " + file);
+                    return;
+                }
+                GarageFiles.Abandoned(file);
+                // the grids are gone from the world and not on disk: put them back where they were
+                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                    VirtualGarageLoad.Spawn(obs,
+                        grids => Log.Error("Could not write " + file + "; the grids were put back into the world"),
+                        why => Log.Error("Could not write " + file + " nor put the grids back (" + why + "): " + group[0].DisplayName + " is lost")));
             });
-
-            return true;
+            return file;
         }
 
-        private static bool AllOwnersOld(List<long> bigOwners)
+        /// <summary>Nobody sits in it, no program runs, no drill turns.</summary>
+        private static void Quiet(MyCubeGrid grid)
         {
-            foreach (var bigOwner in bigOwners)
+            foreach (var block in grid.GetFatBlocks())
             {
-                var MyidentityById = Sync.Players.TryGetIdentity(bigOwner);
-                if (MyidentityById is null)
-                    continue;
-
-                var lastLogoutTime = MyidentityById.LastLogoutTime;
-                var totalDays = (DateTime.Now - lastLogoutTime).TotalDays;
-
-                if (totalDays < Plugin.Instance.Config.OldGridDays)
+                try
                 {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        private static string[] GetDLCs(MyObjectBuilder_CubeGrid[] cubeGrids)
-        {
-            if (cubeGrids.IsNullOrEmpty())
-                return null;
-
-            var hashSet = new HashSet<string>();
-            foreach (var GridEntity in cubeGrids)
-            {
-                foreach (var cubeBlock in GridEntity.CubeBlocks)
-                {
-                    var GetBlockDefinition = MyDefinitionManager.Static.GetCubeBlockDefinition(cubeBlock);
-                    if (GetBlockDefinition is null || GetBlockDefinition.DLCs is null)
-                        continue;
-
-                    if (GetBlockDefinition.DLCs.Length > 0)
+                    switch (block)
                     {
-                        foreach (var DLCName in GetBlockDefinition.DLCs)
-                            hashSet.Add(DLCName);
+                        case MyCockpit cockpit:
+                            cockpit.RemovePilot();
+                            break;
+                        case MyProgrammableBlock programmable:
+                            Plugin.m_myProgrammableBlockKillProgramm?.Invoke(programmable, new object[] { MyProgrammableBlock.ScriptTerminationReason.None });
+                            break;
+                        case MyShipDrill drill:
+                            drill.Enabled = false;
+                            break;
                     }
                 }
+                catch (Exception e)
+                {
+                    Log.Error(e, "Quieting " + block.DisplayNameText + " before saving failed");
+                }
             }
-            return hashSet.ToArray();
+        }
+
+        private static MyObjectBuilder_Definitions Blueprint(List<MyObjectBuilder_CubeGrid> obs, string name, string file)
+        {
+            var blueprint = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_ShipBlueprintDefinition>();
+            blueprint.Id = new MyDefinitionId(new MyObjectBuilderType(typeof(MyObjectBuilder_ShipBlueprintDefinition)),
+                MyUtils.StripInvalidChars(System.IO.Path.GetFileNameWithoutExtension(file)));
+            blueprint.CubeGrids = obs.ToArray();
+            blueprint.DLCs = DLCs(blueprint.CubeGrids);
+            blueprint.RespawnShip = false;
+            blueprint.DisplayName = MyGameService.UserName;
+            blueprint.OwnerSteamId = Sync.MyId;
+            blueprint.CubeGrids[0].DisplayName = name;
+            var definitions = MyObjectBuilderSerializerKeen.CreateNewObject<MyObjectBuilder_Definitions>();
+            definitions.ShipBlueprints = new[] { blueprint };
+            return definitions;
+        }
+
+        private static string[] DLCs(MyObjectBuilder_CubeGrid[] grids)
+        {
+            var dlcs = new HashSet<string>();
+            foreach (var grid in grids)
+                foreach (var block in grid.CubeBlocks)
+                {
+                    var definition = MyDefinitionManager.Static.GetCubeBlockDefinition(block);
+                    if (definition?.DLCs != null) dlcs.UnionWith(definition.DLCs);
+                }
+            return dlcs.ToArray();
         }
     }
 }

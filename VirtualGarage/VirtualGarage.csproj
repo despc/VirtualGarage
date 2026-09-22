@@ -1,241 +1,51 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
-    <ProjectGuid>{F6CA6033-4B1F-4241-ACCB-B43F77745973}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <RootNamespace>VirtualGarage</RootNamespace>
+    <TargetFramework>net48</TargetFramework>
     <AssemblyName>VirtualGarage</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <Nullable>warnings</Nullable>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+    <RootNamespace>VirtualGarage</RootNamespace>
+    <LangVersion>latest</LangVersion>
     <PlatformTarget>x64</PlatformTarget>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-    <LangVersion>Default</LangVersion>
+    <UseWPF>true</UseWPF>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AssemblyVersion>1.0.2.0</AssemblyVersion>
+    <FileVersion>1.0.2.0</FileVersion>
+    <Deterministic>true</Deterministic>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <NoWarn>CS0168;CS0219;CS0414;CS0649;CS1591;NU1701</NoWarn>
+    <!-- Root of the Torch install: Torch.dll next to it, the game in DedicatedServer64. Override with -p:SeRoot=... -->
+    <SeRoot Condition="'$(SeRoot)' == ''">C:\SE</SeRoot>
+    <SeDs>$(SeRoot)\DedicatedServer64</SeDs>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
-    <PlatformTarget>x64</PlatformTarget>
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-    <LangVersion>Default</LangVersion>
-  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="HavokWrapper">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\HavokWrapper.dll</HintPath>
-    </Reference>
-    <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c">
-      <HintPath>C:\SE\VanillaTest\torch-server\NLog.dll</HintPath>
-    </Reference>
-    <Reference Include="ProtoBuf.Net">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\ProtoBuf.Net.dll</HintPath>
-    </Reference>
-    <Reference Include="ProtoBuf.Net, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\ProtoBuf.Net.dll</HintPath>
-    </Reference>
-    <Reference Include="ProtoBuf.Net.Core">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\ProtoBuf.Net.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Sandbox.Common">
-      <HintPath>$(SolutionDir)\GameBinaries\Sandbox.Common.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Sandbox.Common, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\Sandbox.Common.dll</HintPath>
-    </Reference>
-    <Reference Include="Sandbox.Game">
-      <HintPath>$(SolutionDir)\GameBinaries\Sandbox.Game.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Sandbox.Game, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\Sandbox.Game.dll</HintPath>
-    </Reference>
-    <Reference Include="Sandbox.Graphics">
-      <HintPath>$(SolutionDir)\GameBinaries\Sandbox.Graphics.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Sandbox.Graphics, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\Sandbox.Graphics.dll</HintPath>
-    </Reference>
-    <Reference Include="SpaceEngineers.Game">
-      <HintPath>$(SolutionDir)\GameBinaries\SpaceEngineers.Game.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="SpaceEngineers.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\SpaceEngineers.Game.dll</HintPath>
-    </Reference>
-    <Reference Include="SpaceEngineers.ObjectBuilders">
-      <HintPath>$(SolutionDir)\GameBinaries\SpaceEngineers.ObjectBuilders.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="SpaceEngineers.ObjectBuilders, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\SpaceEngineers.ObjectBuilders.dll</HintPath>
-    </Reference>
-    <Reference Include="SpaceEngineers.ObjectBuilders.XmlSerializers">
-      <HintPath>$(SolutionDir)\GameBinaries\SpaceEngineers.ObjectBuilders.XmlSerializers.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="SpaceEngineers.ObjectBuilders.XmlSerializers, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\SpaceEngineers.ObjectBuilders.XmlSerializers.dll</HintPath>
-    </Reference>
-    <Reference Include="Torch">
-      <HintPath>C:\SE\VanillaTest\torch-server\Torch.dll</HintPath>
-    </Reference>
-    <Reference Include="Torch.API">
-      <HintPath>C:\SE\VanillaTest\torch-server\Torch.API.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="VRage, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.Audio">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.Audio.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="VRage.Audio, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Audio.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.Dedicated">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.Dedicated.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="VRage.Dedicated, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Dedicated.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.Game">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.Game.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="VRage.Game, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Game.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.Game.XmlSerializers">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.Game.XmlSerializers.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="VRage.Game.XmlSerializers, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Game.XmlSerializers.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.Input">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.Input.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="VRage.Input, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Input.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.Library, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Library.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.Math">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.Math.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="VRage.Math, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Math.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.NativeWrapper">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.NativeWrapper.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="VRage.NativeWrapper, Version=0.1.1.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.NativeWrapper.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.Render">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.Render.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="VRage.Render, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Render.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.Render11">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.Render11.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="VRage.Render11, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Render11.dll</HintPath>
-    </Reference>
-    <Reference Include="VRage.Scripting">
-      <HintPath>$(SolutionDir)\GameBinaries\VRage.Scripting.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="NLog">
-      <HintPath>$(SolutionDir)\TorchBinaries\NLog.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="PresentationFramework">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="PresentationCore">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xaml" />
-    <Reference Include="System.Xml" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
-    <Reference Include="VRage.Scripting, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>C:\SE\VanillaTest\torch-server\DedicatedServer64\VRage.Scripting.dll</HintPath>
-    </Reference>
-    <Reference Include="WindowsBase" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
+
   <ItemGroup>
-    <AppDesigner Include="Properties\" />
+    <!-- Torch -->
+    <Reference Include="Torch"><HintPath>$(SeRoot)\Torch.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="Torch.API"><HintPath>$(SeRoot)\Torch.API.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="NLog"><HintPath>$(SeRoot)\NLog.dll</HintPath><Private>False</Private></Reference>
+    <!-- Game -->
+    <Reference Include="HavokWrapper"><HintPath>$(SeDs)\HavokWrapper.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="ProtoBuf.Net"><HintPath>$(SeDs)\ProtoBuf.Net.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="ProtoBuf.Net.Core"><HintPath>$(SeDs)\ProtoBuf.Net.Core.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="Sandbox.Common"><HintPath>$(SeDs)\Sandbox.Common.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="Sandbox.Game"><HintPath>$(SeDs)\Sandbox.Game.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="Sandbox.Graphics"><HintPath>$(SeDs)\Sandbox.Graphics.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="SpaceEngineers.Game"><HintPath>$(SeDs)\SpaceEngineers.Game.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="SpaceEngineers.ObjectBuilders"><HintPath>$(SeDs)\SpaceEngineers.ObjectBuilders.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage"><HintPath>$(SeDs)\VRage.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage.Game"><HintPath>$(SeDs)\VRage.Game.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage.Library"><HintPath>$(SeDs)\VRage.Library.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage.Math"><HintPath>$(SeDs)\VRage.Math.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="VRage.Network"><HintPath>$(SeDs)\VRage.Network.dll</HintPath><Private>False</Private></Reference>
   </ItemGroup>
+
   <ItemGroup>
-    <Folder Include="Properties\" />
+    <None Include="manifest.xml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Commands\VirtualGarageHelpCommand.cs" />
-    <Compile Include="GridLoad\FixShipLogic.cs" />
-    <Compile Include="GridLoad\Voxels.cs" />
-    <Compile Include="Views\DisplayTab.cs" />
-    <Compile Include="Views\FilteredGrid.cs" />
-    <Compile Include="Views\UserControl1.xaml.cs">
-      <DependentUpon>UserControl1.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="GridLoad\VirtualGarageLoad.cs" />
-    <Compile Include="Configuration\PluginConfig.cs" />
-    <Compile Include="Plugin.cs" />
-    <Compile Include="Commands\VirtualGarageCommands.cs" />
-    <Compile Include="GridSave\VirtualGarageSave.cs" />
-    <Compile Include="GridSave\VirtualGarageOldGridProcessor.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Page Include="Views\UserControl1.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Include="Views\FilteredGrid.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <ItemGroup>
-    <Content Include="$(ProjectDir)\manifest.xml" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-  <Target Name="Zip" BeforeTargets="AfterBuild">
-    <MakeDir Directories="$(SolutionDir)\Build\" />
-    <ZipDirectory SourceDirectory="$(OutputPath)" DestinationFile="$(SolutionDir)\Build\$(MSBuildProjectName).zip" Overwrite="true" />
-  </Target>
+
 </Project>

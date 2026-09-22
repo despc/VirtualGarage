@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Reflection;
 using System.Windows.Controls;
@@ -37,15 +37,10 @@ namespace VirtualGarage
             _sessionManager = Torch.Managers.GetManager<TorchSessionManager>();
             if (_sessionManager == null)
                 return;
-            MySession.OnSaved += OnSaved;
             _sessionManager.SessionStateChanged += SessionManager_SessionStateChanged;
             m_myProgrammableBlockKillProgramm = typeof(MyProgrammableBlock).GetMethod("OnProgramTermination", BindingFlags.Instance | BindingFlags.NonPublic);
         }
 
-        private void OnSaved(bool arg1, string arg2)
-        {
-            VirtualGarageOldGridProcessor.OldGridProcessor.OnSaved();
-        }
 
         private void SessionManager_SessionStateChanged(ITorchSession session, TorchSessionState newState)
         {

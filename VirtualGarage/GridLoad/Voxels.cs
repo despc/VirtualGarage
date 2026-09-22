@@ -9,42 +9,6 @@ using VRageMath;
 namespace Scripts.Shared {
     public static class Voxels {
         
-        public static bool IsInsideVoxel(this IMySlimBlock block, MyGridPlacementSettings settings) { 
-            if (block.FatBlock == null) return false; //ERROR
-            var def = block.BlockDefinition;
-            if (!(def is MyCubeBlockDefinition)) return false;
-            
-            var CurrentBlockDefinition = def as MyCubeBlockDefinition;
-            var cellSize = MyDefinitionManager.Static.GetCubeSize(CurrentBlockDefinition.CubeSize);
-            var localBB = new BoundingBoxD(-CurrentBlockDefinition.Size * cellSize * 0.5f, CurrentBlockDefinition.Size * cellSize * 0.5f);
-            var isAllowed = MyCubeGrid.IsAabbInsideVoxel(block.FatBlock.WorldMatrix, localBB, settings);
-            return !isAllowed;
-        }
-
-        public static bool IsInsideVoxels(this IMyPlayer Me_Player) {
-            try {
-                var Me = Me_Player.Character;
-                if (Me == null) return false; 
-                var vsettings = new VoxelPlacementSettings {PlacementMode = VoxelPlacementMode.Volumetric, MaxAllowed = 0.95f, MinAllowed = 0};
-                var settings = new MyGridPlacementSettings {
-                   CanAnchorToStaticGrid = true,
-                   EnablePreciseRotationWhenSnapped = true,
-                   SearchHalfExtentsDeltaAbsolute = 0,
-                   SearchHalfExtentsDeltaRatio = 0,
-                   SnapMode = SnapMode.Base6Directions,
-                   VoxelPlacement = vsettings
-                };
-
-                var worldMatrix = Me.WorldMatrix;
-                var localAabb = Me.LocalAABB;
-
-                return MyCubeGrid.IsAabbInsideVoxel(worldMatrix, localAabb, settings);
-            } catch (Exception e) {
-                //
-                return false;
-            }
-        }
-
         public static bool IsGridInsideVoxel(IMyCubeGrid cubeGrid) { 
             try {
                 MyGridPlacementSettings grid_settings = new MyGridPlacementSettings();
@@ -79,20 +43,6 @@ namespace Scripts.Shared {
                 
                 //return;
             }
-            return false;
-        }
-
-
-        public static bool CheckEachGridBlock(IMyCubeGrid cubeGrid, MyGridPlacementSettings settings)  { 
-            var blocks = new List<IMySlimBlock>();
-            cubeGrid.GetBlocks(blocks, block => block.FatBlock != null);
-            foreach (IMySlimBlock block in blocks) {
-                if (!block.IsInsideVoxel(settings)) continue;
-                var Block_Type = block.BlockDefinition.Id.SubtypeName;
-                //
-                return true;
-            }
-
             return false;
         }
     }
