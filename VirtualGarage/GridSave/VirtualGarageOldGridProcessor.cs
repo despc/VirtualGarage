@@ -83,21 +83,63 @@ namespace VirtualGarage
             StoreNext();
         }
 
+        // The search for old groups goes over the world this many blocks a frame: a group with no owner is
+        // looked at block by block for its builders, and the whole world in one frame was a stall.
+        private const int BlocksPerFrame = 20000;
+        private List<MyCubeGrid> _scan = new List<MyCubeGrid>();
+        private int _scanCursor;
+        private readonly HashSet<MyCubeGrid> _scanSeen = new HashSet<MyCubeGrid>();
+        private readonly List<List<MyCubeGrid>> _scanOld = new List<List<MyCubeGrid>>();
+        private int _scanDays;
+
         private void QueueOldGroups()
         {
-            var days = Plugin.Instance.Config.OldGridDays;
-            if (days <= 0) return;
+            _scanDays = Plugin.Instance.Config.OldGridDays;
+            if (_scanDays <= 0) return;
+            _scan = MyEntities.GetEntities().OfType<MyCubeGrid>().ToList();
+            _scanCursor = 0;
+            _scanSeen.Clear();
+            _scanOld.Clear();
+            ScanStep();
+        }
+
+        /// <summary>The next groups of the search for old ones, <see cref="BlocksPerFrame"/> blocks; then the next frame. Game thread.</summary>
+        private void ScanStep()
+        {
             try
             {
-                var old = PlayerGroups(g => !g.Any(x => x.DisplayName.Contains("@")) && IsOld(g, days));
-                if (old.Count > 0) Log.Warn(old.Count + " grid groups of players gone for " + days + "+ days go into their garages");
-                Enqueue(old);
+                var blocks = 0;
+                while (_scanCursor < _scan.Count && blocks < BlocksPerFrame)
+                {
+                    var grid = _scan[_scanCursor++];
+                    if (grid.MarkedForClose || grid.IsPreview || _scanSeen.Contains(grid)) continue;
+                    var group = VirtualGarageSave.Group(grid);
+                    _scanSeen.UnionWith(group);
+                    blocks += 1 + group.Sum(g => g.BlocksCount);
+                    if (BelongsToPlayer(group) && !group.Any(x => x.DisplayName.Contains("@")) && IsOld(group, _scanDays))
+                        _scanOld.Add(group);
+                }
             }
             catch (Exception e)
             {
                 Log.Error(e, "Looking for old grids failed");
+                _scanCursor = _scan.Count;
             }
+
+            if (_scanCursor < _scan.Count)
+            {
+                MyAPIGateway.Utilities.InvokeOnGameThread(ScanStep, StartAt: NextFrame());
+                return;
+            }
+            var old = _scanOld.ToList();
+            _scan = new List<MyCubeGrid>();
+            _scanSeen.Clear();
+            _scanOld.Clear();
+            if (old.Count > 0) Log.Warn(old.Count + " grid groups of players gone for " + _scanDays + "+ days go into their garages");
+            Enqueue(old);
         }
+
+        private static int NextFrame() => (MySession.Static?.GameplayFrameCounter ?? 0) + 1;
 
         private void StoreNext()
         {
@@ -120,7 +162,7 @@ namespace VirtualGarage
             {
                 Log.Error(e, "Putting a grid into the garage failed");
             }
-            MyAPIGateway.Utilities.InvokeOnGameThread(StoreNext);
+            MyAPIGateway.Utilities.InvokeOnGameThread(StoreNext, StartAt: NextFrame());
         }
 
         // ------------------------------------------------------------------ whose, and how old
