@@ -45,12 +45,16 @@ namespace VirtualGarage
         private void SessionManager_SessionStateChanged(ITorchSession session, TorchSessionState newState)
         {
             if (newState == TorchSessionState.Unloading)
+            {
+                Market.ShipMarket.OnUnloading();
                 return;
+            }
 
             if (newState != TorchSessionState.Loaded)
                 return;
 
             VirtualGarageOldGridProcessor.OldGridProcessor.OnLoaded();
+            Sandbox.ModAPI.MyAPIGateway.Utilities.InvokeOnGameThread(Market.ShipMarket.OnLoaded);
         }
 
         public void LoadConfig()

@@ -155,8 +155,11 @@ namespace VirtualGarage
             }
             var file = files[index - 1];
 
-            // taking out is free: the garage is paid for when a grid is put into it (SavePcuCost)
-            if (!original && TooMuchGravity(character)) return;
+            // Taking out is free: the garage is paid for when a grid is put into it (SavePcuCost). A grid bought on a
+            // trade console comes out next to the player wherever he is, whatever the settings (only where it was
+            // saved, the gravity); taken out and put back, it has a new file and the usual rules.
+            if (GarageFiles.IsBought(file)) original = false;
+            else if (!original && TooMuchGravity(character)) return;
             if (EnemyNear(player)) return;
 
             var context = Context;

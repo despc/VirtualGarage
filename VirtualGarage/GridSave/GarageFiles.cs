@@ -19,6 +19,9 @@ namespace VirtualGarage
     ///                             world save. A crash puts the file back - or deletes it, when it
     ///                             was itself unsaved (put in and taken out between two saves).
     ///  name.sbc_spawned           taken out and saved; deleted after a week.
+    ///  name_bought.sbc            bought on a trade console (Market.ShipMarket): in the garage, taken out free,
+    ///                             next to the player wherever he is, whatever the settings. Taken out and put back,
+    ///                             the grid has a new file: the usual rules.
     ///
     /// An operation counts once a world save that saw it is on disk. Every operation gets a
     /// number when it happens, on the game thread; a world save notes the last number when it takes
@@ -32,7 +35,8 @@ namespace VirtualGarage
 
         private const string Unsaved = "_unsaved.sbc";
         private const string Extension = ".sbc";
-        private const string TakenOutUnsaved = "_spawned_unsaved";
+        public const string TakenOutUnsaved = "_spawned_unsaved";
+        private const string Bought = "_bought.sbc";
         private const string TakenOut = "_spawned";
         private const string LegacyB5 = ".sbcB5";
         private const double KeepTakenOutDays = 7;
@@ -73,7 +77,25 @@ namespace VirtualGarage
         private static bool IsInGarage(string file) => file.EndsWith(Extension, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>What !g list shows for a file.</summary>
-        public static string Title(string file) => Path.GetFileName(file).Replace(Unsaved, "").Replace(Extension, "");
+        public static string Title(string file) =>
+            IsBought(file)
+                ? Path.GetFileName(file).Substring(0, Path.GetFileName(file).Length - Bought.Length) + " (куплен)"
+                : Path.GetFileName(file).Replace(Unsaved, "").Replace(Extension, "");
+
+        /// <summary>Bought on a trade console and not taken out since: free, next to the player, whatever the settings.</summary>
+        public static bool IsBought(string file) => file.EndsWith(Bought, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>A free name in <paramref name="folder"/> for the bought garage file <paramref name="fileName"/>: the seller's name, marked bought.</summary>
+        public static string BoughtFile(string folder, string fileName)
+        {
+            var name = fileName.EndsWith(Bought, StringComparison.OrdinalIgnoreCase) ? fileName.Substring(0, fileName.Length - Bought.Length)
+                : fileName.EndsWith(Extension, StringComparison.OrdinalIgnoreCase) ? fileName.Substring(0, fileName.Length - Extension.Length)
+                : fileName;
+            var target = Path.Combine(folder, name + Bought);
+            for (var n = 1; File.Exists(target) || File.Exists(target + TakenOutUnsaved); n++)
+                target = Path.Combine(folder, name + "_" + n + Bought);
+            return target;
+        }
 
         /// <summary>The PCU in a file's name, or null.</summary>
         public static int? Pcu(string file)
@@ -101,6 +123,12 @@ namespace VirtualGarage
 
         /// <summary>The number of the last operation. Game thread, when a world snapshot is taken.</summary>
         public static long LastOperation => Interlocked.Read(ref _last);
+
+        /// <summary>A number for an operation of another part (a trade console's purchase), counted like the garage's own.</summary>
+        public static long NextOperation() => Interlocked.Increment(ref _last);
+
+        /// <summary>A rename of a garage file (retried a little while the file is in use).</summary>
+        public static bool Rename(string from, string to) => Move(from, to);
 
         /// <summary>
         /// A new file for a grid put into the garage now (game thread). The file is written aside
@@ -160,6 +188,9 @@ namespace VirtualGarage
         /// <summary>A world save that saw every operation up to <paramref name="last"/> is on disk. Any thread.</summary>
         public static void OnWorldSaved(long last)
         {
+            // the purchases first: a crash between the two never undoes a purchase the world has saved
+            Market.ShipMarket.OnWorldSaved(last);
+
             lock (Lock)
             {
                 foreach (var operation in Operations.Where(o => o.Number <= last).OrderBy(o => o.Number).ToList())
@@ -196,6 +227,7 @@ namespace VirtualGarage
         public static void OnWorldLoaded()
         {
             lock (Lock) Operations.Clear();
+            Market.ShipMarket.OnWorldLoaded();
             foreach (var file in AllFiles())
             {
                 if (file.EndsWith(Unsaved, StringComparison.OrdinalIgnoreCase) || file.EndsWith(Partial, StringComparison.OrdinalIgnoreCase))
