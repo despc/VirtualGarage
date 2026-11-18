@@ -2,17 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
 using NLog;
 using ProtoBuf;
 using Sandbox.Game;
+using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
-using Sandbox.Game.GameSystems.BankingAndCurrency;
 using Sandbox.Game.GUI;
+using Sandbox.Game.GameSystems.BankingAndCurrency;
 using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using VRage.Game;
+using VRage.Game.Entity;
+using VRageMath;
 
 namespace VirtualGarage.Market
 {
@@ -68,14 +72,30 @@ namespace VirtualGarage.Market
         public ulong BuyerSteamId;
         public string BuyerFile;
         public long Operation;
+
+        /// <summary>Where the console stood when the ship was put up: a console moved (or made a ship) takes its ship off.</summary>
+        public double ConsoleX, ConsoleY, ConsoleZ;
+
+        /// <summary>Since when the console is not found (FixShip makes it again under another id: it is looked for at its place).</summary>
+        [XmlIgnore] public DateTime? MissingSince;
+
+        [XmlIgnore] public Vector3D ConsoleAt
+        {
+            get => new Vector3D(ConsoleX, ConsoleY, ConsoleZ);
+            set { ConsoleX = value.X; ConsoleY = value.Y; ConsoleZ = value.Z; }
+        }
     }
 
     /// <summary>
     /// The trade console, on the server. A player puts a ship from his garage up for sale on his console at his
-    /// price; another buys it with credits: the seller is paid and the ship is in the buyer's garage at once, as a
+    /// price - a ship put into the garage near the console (<see cref="NearConsole"/>), on a console of a station;
+    /// another player, not of the seller's faction, buys it with credits: the seller is paid and the ship is in the
+    /// buyer's garage at once, as a
     /// bought file (<see cref="GarageFiles.IsBought"/>: taken out free, next to the player wherever he is, whatever
     /// the garage's settings). All of it is decided here, from the client's real sender (the console's old server
-    /// part, in SentisOptimisations, took the buyer and the price from the client's message).
+    /// part, in SentisOptimisations, took the buyer and the price from the client's message). So a ship goes no
+    /// further than to the console by a sale: a faction does not move its ships across the map by selling them to
+    /// itself, and the console sells only where it stands - a console made a ship, or moved, takes its ship off.
     ///
     /// A crash neither loses nor copies a ship (<see cref="GarageFiles"/>): the money moves in the world, the file
     /// on disk. Until a world save that saw the purchase is written the purchase is remembered; a crash before that
@@ -92,11 +112,22 @@ namespace VirtualGarage.Market
         private const string Extension = ".sbc";
         private const string Unsaved = "_unsaved.sbc";
         private const long MaxPrice = 1_000_000_000_000L;
-        private const int OrphanCheckDelayMs = 120000;
+
+        /// <summary>How near the console a ship on sale was put into the garage, m.</summary>
+        public const double NearConsole = 1000;
+
+        /// <summary>A console further than this from where it stood when its ship was put up has moved, m.</summary>
+        private const double MovedBy = 1;
+
+        /// <summary>A console not found that long (gone, not made again in its place) gives its ship back.</summary>
+        private static readonly TimeSpan GoneAfter = TimeSpan.FromMinutes(2);
+
+        private const int WatchMs = 10000;
 
         private static readonly object Lock = new object();
         private static List<Listing> _listings = new List<Listing>();
         private static Action<ushort, byte[], ulong, bool> _handler;
+        private static Timer _watch;
 
         private static string IndexPath => Path.Combine(GarageFiles.Root, "market.xml");
 
@@ -112,15 +143,14 @@ namespace VirtualGarage.Market
                 Log.Info("Trade console listening");
             }
 
-            Task.Run(async () =>
-            {
-                await Task.Delay(OrphanCheckDelayMs);
-                MyAPIGateway.Utilities.InvokeOnGameThread(ReturnOrphans);
-            });
+            _watch?.Dispose();
+            _watch = new Timer(_ => MyAPIGateway.Utilities?.InvokeOnGameThread(Watch), null, WatchMs, WatchMs);
         }
 
         public static void OnUnloading()
         {
+            _watch?.Dispose();
+            _watch = null;
             if (_handler == null) return;
             MyAPIGateway.Multiplayer?.UnregisterSecureMessageHandler(Channel, _handler);
             _handler = null;
@@ -173,28 +203,105 @@ namespace VirtualGarage.Market
             }
         }
 
-        /// <summary>Ships on sale on a console that is no more: back into the seller's garage.</summary>
-        private static void ReturnOrphans()
+        // ------------------------------------------------------------------ the consoles' place (game thread)
+
+        /// <summary>
+        /// Every ship on sale, its console looked at: found (under its id, or made again in its place by FixShip), a
+        /// station, where it stood. A console made a ship or moved gives the ship back at once, one gone for
+        /// <see cref="GoneAfter"/> too.
+        /// </summary>
+        public static void Watch()
         {
             try
             {
+                var now = DateTime.Now;
                 lock (Lock)
                 {
-                    var orphans = _listings.Where(l => !l.Pending && Console(l.ShipyardId) == null).ToList();
-                    foreach (var listing in orphans)
+                    foreach (var listing in _listings.Where(l => !l.Pending).ToList())
                     {
-                        var back = Unlisted(listing.File);
-                        if (GarageFiles.Rename(listing.File, back)) _listings.Remove(listing);
-                        Log.Warn("Trade console " + listing.ShipyardId + " is gone: " + back + " back in the garage");
+                        var console = Console(listing.ShipyardId) ?? FindAgain(listing);
+                        if (console == null)
+                        {
+                            listing.MissingSince = listing.MissingSince ?? now;
+                            if (now - listing.MissingSince.Value > GoneAfter) GiveBack(listing, null, "консоли больше нет");
+                            continue;
+                        }
+                        listing.MissingSince = null;
+                        var why = NotInPlace(console, listing);
+                        if (why != null) GiveBack(listing, console, why);
                     }
-
-                    if (orphans.Count > 0) Save();
                 }
             }
             catch (Exception e)
             {
-                Log.Error(e, "Returning the ships of gone consoles failed");
+                Log.Error(e, "Watching the trade consoles failed");
             }
+        }
+
+        /// <summary>Why the console does not sell its ship any more, or null.</summary>
+        private static string NotInPlace(MyProjectorBase console, Listing listing)
+        {
+            if (!console.CubeGrid.IsStatic) return "консоль стала частью корабля";
+            if (Vector3D.Distance(console.PositionComp.GetPosition(), listing.ConsoleAt) > MovedBy) return "консоль сдвинута с места";
+            return null;
+        }
+
+        /// <summary>
+        /// The console of a listing made again in its place (FixShip remaps the ids of a grid it makes anew): the same
+        /// block of the same owner where the console stood. Taken for the listing, the ship projected on it again.
+        /// </summary>
+        private static MyProjectorBase FindAgain(Listing listing)
+        {
+            var sphere = new BoundingSphereD(listing.ConsoleAt, MovedBy);
+            var found = new List<MyEntity>();
+            MyGamePruningStructure.GetAllTopMostEntitiesInSphere(ref sphere, found);
+            foreach (var grid in found.OfType<MyCubeGrid>())
+            {
+                if (grid.MarkedForClose || grid.IsPreview) continue;
+                foreach (var block in grid.GetFatBlocks())
+                {
+                    if (!(block is MyProjectorBase console) || console.BlockDefinition.Id.SubtypeName != ConsoleSubtype) continue;
+                    if (console.OwnerId != listing.SellerIdentity || Vector3D.Distance(console.PositionComp.GetPosition(), listing.ConsoleAt) > MovedBy) continue;
+                    if (_listings.Any(l => l != listing && !l.Pending && l.ShipyardId == console.EntityId)) continue;
+                    Log.Info($"Trade console {listing.ShipyardId} made again as {console.EntityId}: {listing.ShipName} stays on sale");
+                    listing.ShipyardId = console.EntityId;
+                    Save();
+                    Project(console, listing.File);
+                    return console;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>The console's own listing, once its place is looked at: one not in its place is given back. Game thread, under the lock.</summary>
+        private static Listing ValidListingOf(MyProjectorBase console)
+        {
+            var listing = ListingOf(console.EntityId);
+            if (listing == null)
+            {
+                // a console made again (FixShip): its listing waits for it at its place
+                foreach (var waiting in _listings.Where(l => !l.Pending && Console(l.ShipyardId) == null).ToList())
+                    if (FindAgain(waiting) == console) listing = waiting;
+                if (listing == null) return null;
+            }
+            var why = NotInPlace(console, listing);
+            if (why == null) return listing;
+            GiveBack(listing, console, why);
+            return null;
+        }
+
+        /// <summary>A ship off sale, back into its seller's garage, and he is told why. Under the lock.</summary>
+        private static void GiveBack(Listing listing, MyProjectorBase console, string why)
+        {
+            var back = Unlisted(listing.File);
+            if (!GarageFiles.Rename(listing.File, back)) return;
+            _listings.Remove(listing);
+            Save();
+            Log.Warn($"Trade console {listing.ShipyardId}: {listing.ShipName} off sale ({why}), {back} back in the garage");
+            Say(listing.SellerSteamId, "«" + listing.ShipName + "» снят с продажи: " + why + ". Корабль вернулся в ваш гараж");
+            if (console == null) return;
+            ((IMyProjector)console).SetProjectedGrid(null);
+            BroadcastState(console);
         }
 
         // ------------------------------------------------------------------ the messages (game thread)
@@ -261,7 +368,7 @@ namespace VirtualGarage.Market
         {
             lock (Lock)
             {
-                var listing = ListingOf(console.EntityId);
+                var listing = ValidListingOf(console);
                 return listing == null
                     ? new MarketMessage { Type = MarketMessageType.State, ShipyardId = console.EntityId }
                     : new MarketMessage
@@ -285,36 +392,88 @@ namespace VirtualGarage.Market
             if (console.OwnerId != identity) { Say(sender, "Продавать на этой консоли может только её владелец"); return; }
             if (price < 0 || price > MaxPrice) { Say(sender, "Неверная цена"); return; }
             if (string.IsNullOrEmpty(name)) return;
+            if (!console.CubeGrid.IsStatic) { Say(sender, "Торговая консоль работает только на станции"); return; }
 
+            string file;
             lock (Lock)
             {
-                if (ListingOf(console.EntityId) != null) { Say(sender, "На консоли уже продаётся корабль"); return; }
-                var file = Sellable(sender).FirstOrDefault(f => GarageFiles.Title(f) == name);
+                if (ValidListingOf(console) != null) { Say(sender, "На консоли уже продаётся корабль"); return; }
+                file = Sellable(sender).FirstOrDefault(f => GarageFiles.Title(f) == name);
                 if (file == null) { Say(sender, "Корабля «" + name + "» нет в гараже (или мир ещё не сохранён после уборки)"); return; }
-
-                var listed = file + ListedSuffix;
-                if (!GarageFiles.Rename(file, listed)) { Say(sender, "Не удалось выставить корабль"); return; }
-
-                var player = MySession.Static.Players.TryGetIdentity(identity);
-                _listings.Add(new Listing
-                {
-                    ShipyardId = console.EntityId, SellerSteamId = sender, SellerIdentity = identity,
-                    SellerName = player?.DisplayName ?? sender.ToString(), File = listed, ShipName = name, Price = price
-                });
-                Save();
-                Log.Info($"{sender} put {name} up for {price} on trade console {console.EntityId}");
-                Project(console, listed);
             }
 
-            BroadcastState(console);
-            SendGarage(console, sender, identity);
+            // where the ship was put into the garage: in its file (read aside, a big ship is a big file)
+            var consoleAt = console.PositionComp.GetPosition();
+            Task.Run(() =>
+            {
+                var grid = ReadMainGrid(file);
+                MyAPIGateway.Utilities.InvokeOnGameThread(() =>
+                {
+                    try
+                    {
+                        if (grid?.PositionAndOrientation == null) { Say(sender, "Не удалось прочитать корабль из гаража"); return; }
+                        var distance = Vector3D.Distance(grid.PositionAndOrientation.Value.Position, consoleAt);
+                        if (distance > NearConsole)
+                        {
+                            Say(sender, "Продать можно только корабль, убранный в гараж не дальше " + NearConsole.ToString("0") +
+                                        " м от консоли. «" + name + "» убран в " + (distance / 1000).ToString("0.#") + " км");
+                            return;
+                        }
+                        if (console.Closed || console.MarkedForClose || !console.CubeGrid.IsStatic) return;
+
+                        lock (Lock)
+                        {
+                            if (ValidListingOf(console) != null) { Say(sender, "На консоли уже продаётся корабль"); return; }
+                            if (!File.Exists(file) || !Sellable(sender).Contains(file)) { Say(sender, "Корабля «" + name + "» уже нет в гараже"); return; }
+                            var listed = file + ListedSuffix;
+                            if (!GarageFiles.Rename(file, listed)) { Say(sender, "Не удалось выставить корабль"); return; }
+
+                            var player = MySession.Static.Players.TryGetIdentity(identity);
+                            _listings.Add(new Listing
+                            {
+                                ShipyardId = console.EntityId, SellerSteamId = sender, SellerIdentity = identity,
+                                SellerName = player?.DisplayName ?? sender.ToString(), File = listed, ShipName = name, Price = price,
+                                ConsoleAt = console.PositionComp.GetPosition()
+                            });
+                            Save();
+                            Log.Info($"{sender} put {name} up for {price} on trade console {console.EntityId} (put into the garage {distance:0} m from it)");
+                            ((IMyProjector)console).SetProjectedGrid(grid);
+                            console.Enabled = true;
+                        }
+
+                        BroadcastState(console);
+                        SendGarage(console, sender, identity);
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(e, "Putting " + file + " up for sale failed");
+                    }
+                });
+            });
+        }
+
+        /// <summary>The main (first) grid of a garage file, or null. Any thread.</summary>
+        private static MyObjectBuilder_CubeGrid ReadMainGrid(string file)
+        {
+            try
+            {
+                var grid = MyBlueprintUtils.LoadPrefab(file)?.ShipBlueprints?.FirstOrDefault()?.CubeGrids?.FirstOrDefault();
+                var cache = file + "B5";
+                if (File.Exists(cache)) File.Delete(cache);
+                return grid;
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Reading " + file + " for the trade console failed");
+                return null;
+            }
         }
 
         private static void Cancel(MyProjectorBase console, ulong sender, long identity)
         {
             lock (Lock)
             {
-                var listing = ListingOf(console.EntityId);
+                var listing = ValidListingOf(console);
                 if (listing == null) return;
                 if (identity != console.OwnerId && identity != listing.SellerIdentity) { Say(sender, "Снять с продажи может только продавец"); return; }
                 var back = Unlisted(listing.File);
@@ -333,9 +492,15 @@ namespace VirtualGarage.Market
         {
             lock (Lock)
             {
-                var listing = ListingOf(console.EntityId);
+                var listing = ValidListingOf(console);
                 if (listing == null) { Say(sender, "На консоли ничего не продаётся"); return; }
                 if (identity == listing.SellerIdentity || sender == listing.SellerSteamId) { Say(sender, "Свой корабль купить нельзя"); return; }
+                var sellerFaction = MySession.Static.Factions.GetPlayerFaction(listing.SellerIdentity);
+                if (sellerFaction != null && sellerFaction == MySession.Static.Factions.GetPlayerFaction(identity))
+                {
+                    Say(sender, "Соклановцы не могут покупать корабли друг у друга");
+                    return;
+                }
                 if (!File.Exists(listing.File)) { Say(sender, "Корабль не найден"); return; }
                 if (MyBankingSystem.GetBalance(identity) < listing.Price) { Say(sender, "Недостаточно кредитов"); return; }
 
@@ -377,18 +542,7 @@ namespace VirtualGarage.Market
         {
             Task.Run(() =>
             {
-                MyObjectBuilder_CubeGrid grid = null;
-                try
-                {
-                    grid = MyBlueprintUtils.LoadPrefab(file)?.ShipBlueprints?.FirstOrDefault()?.CubeGrids?.FirstOrDefault();
-                    var cache = file + "B5";
-                    if (File.Exists(cache)) File.Delete(cache);
-                }
-                catch (Exception e)
-                {
-                    Log.Error(e, "Reading " + file + " for the trade console failed");
-                }
-
+                var grid = ReadMainGrid(file);
                 if (grid == null) return;
                 MyAPIGateway.Utilities.InvokeOnGameThread(() =>
                 {
